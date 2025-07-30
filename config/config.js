@@ -14,7 +14,7 @@ const config = {
     maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
     
     // Configurações de paginação
-    maxPagesPerRun: parseInt(process.env.MAX_PAGES_PER_RUN) || 100,
+    maxPagesPerRun: parseInt(process.env.MAX_PAGES_PER_RUN) || 5, // Reduzido para testes
     maxEmptyPagesConsecutive: parseInt(process.env.MAX_EMPTY_PAGES_CONSECUTIVE) || 5,
     recommendedPacksPaginationEnabled: process.env.RECOMMENDED_PAGINATION_ENABLED !== 'false',
     

@@ -336,7 +336,9 @@ class PackProcessor {
       const existingIds = await this.supabaseClient.getAllPackIds();
       this.existingPackIds = new Set(existingIds);
       this.cacheLoaded = true;
-      info(`Cache carregado: ${this.existingPackIds.size} packs existentes`);
+      info(`Cache carregado: ${this.existingPackIds.size} packs existentes`, {
+        sampleIds: existingIds.slice(0, 5) // Mostrar primeiros 5 IDs como exemplo
+      });
     } catch (err) {
       error('Erro ao carregar cache de IDs', err);
       // Fallback para verificação individual
@@ -349,7 +351,16 @@ class PackProcessor {
    */
   async packExistsOptimized(packId) {
     if (this.cacheLoaded) {
-      return this.existingPackIds.has(packId);
+      const exists = this.existingPackIds.has(packId);
+      // Debug: log apenas os primeiros 5 para não poluir
+      if (this.debugLogCount < 5) {
+        info(`Verificação cache: ${packId} -> ${exists ? 'EXISTE' : 'NOVO'}`, {
+          cacheSize: this.existingPackIds.size,
+          debugCount: this.debugLogCount
+        });
+        this.debugLogCount = (this.debugLogCount || 0) + 1;
+      }
+      return exists;
     }
     // Fallback para verificação individual
     return await this.supabaseClient.packExists(packId);
@@ -367,23 +378,45 @@ class PackProcessor {
       // Carregar cache de IDs existentes
       await this.loadExistingPackIds();
 
-      // Usar paginação para buscar packs
-      const allPacks = await this.stickerlyClient.getRecommendedPacksWithPagination(locale);
-      const validPacks = this.stickerlyClient.filterValidPacks(allPacks);
-
       let successfulPacks = 0;
       let processedPacks = 0; // Contador de packs efetivamente processados
       let consecutiveExisting = 0; // Contador de packs consecutivos existentes
+      let skippedExisting = 0; // Contador de packs já existentes
+      let cursor = 0;
+      let totalPacksFound = 0;
       
       const targetNewPacks = config.scraping.maxPacksPerRun;
+      const maxPages = config.scraping.maxPagesPerRun;
 
-      info(`Processando packs recomendados`, { 
+      info(`Processando packs recomendados página por página`, { 
         locale,
-        availablePacks: validPacks.length,
-        targetNewPacks: targetNewPacks
+        targetNewPacks: targetNewPacks,
+        maxPages: maxPages,
+        cacheLoaded: this.cacheLoaded,
+        cachedPacksCount: this.existingPackIds.size
       });
 
-      for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
+      // Processar página por página até atingir limite ou máximo de páginas
+      while (cursor < maxPages && successfulPacks < targetNewPacks) {
+        // Buscar uma página por vez
+        const pagePacks = await this.stickerlyClient.getRecommendedPacks(locale, cursor);
+        const validPacks = this.stickerlyClient.filterValidPacks(pagePacks);
+        
+        if (validPacks.length === 0) {
+          info(`Página ${cursor} vazia, parando`, { locale });
+          break;
+        }
+
+        totalPacksFound += validPacks.length;
+        info(`Processando página ${cursor}: ${validPacks.length} packs válidos`, {
+          locale,
+          cursor,
+          totalFound: totalPacksFound,
+          successfulSoFar: successfulPacks
+        });
+
+        // Processar packs da página atual
+        for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
         const pack = validPacks[i];
 
         try {
@@ -398,8 +431,17 @@ class PackProcessor {
           if (existingPackId) {
             info(`Pack já existe no banco: ${pack.packId}`);
             consecutiveExisting++;
+            skippedExisting++;
             continue;
           }
+
+          // Log detalhado quando encontra pack novo
+          info(`Pack NOVO encontrado: ${pack.packId}`, {
+            packName: pack.name,
+            index: i,
+            consecutiveExisting,
+            skippedExisting
+          });
 
           // Reset contador se encontrou pack novo
           consecutiveExisting = 0;
@@ -422,6 +464,13 @@ class PackProcessor {
           error(`Erro ao processar pack recomendado: ${pack.packId}`, err);
           processedPacks++;
         }
+        }
+
+        // Delay entre páginas e incrementar cursor
+        cursor++;
+        if (cursor < maxPages && successfulPacks < targetNewPacks) {
+          await this.stickerlyClient.delay(1000); // Delay um pouco maior entre páginas
+        }
       }
 
       scrapingEnd(locale, processedPacks, successfulPacks);
@@ -431,8 +480,10 @@ class PackProcessor {
         total: processedPacks,
         successful: successfulPacks,
         failed: processedPacks - successfulPacks,
-        availablePacks: validPacks.length,
-        skippedExisting: validPacks.length - processedPacks
+        totalPacksFound: totalPacksFound,
+        skippedExisting: skippedExisting,
+        newPacksFound: totalPacksFound - skippedExisting,
+        pagesProcessed: cursor
       });
 
       // Atualizar estatísticas
