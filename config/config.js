@@ -13,6 +13,11 @@ const config = {
     delayBetweenRequests: parseInt(process.env.DELAY_BETWEEN_REQUESTS) || 2000,
     maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
     
+    // Configurações de paginação
+    maxPagesPerRun: parseInt(process.env.MAX_PAGES_PER_RUN) || 100,
+    maxEmptyPagesConsecutive: parseInt(process.env.MAX_EMPTY_PAGES_CONSECUTIVE) || 5,
+    recommendedPacksPaginationEnabled: process.env.RECOMMENDED_PAGINATION_ENABLED !== 'false',
+    
     // Locales baseados no código original
     locales: [
       { locale: 'pt-BR', lang: 'pt' }

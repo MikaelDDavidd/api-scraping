@@ -320,7 +320,7 @@ class PackProcessor {
   }
 
   /**
-   * Processa packs recomendados por locale
+   * Processa packs recomendados por locale com paginação inteligente
    */
   async processRecommendedPacks(locale = "pt-BR") {
     const lang = this.getLanguageFromLocale(locale);
@@ -328,39 +328,89 @@ class PackProcessor {
     try {
       scrapingStart(locale);
 
-      const packs = await this.stickerlyClient.getRecommendedPacks(locale);
-      const validPacks = this.stickerlyClient.filterValidPacks(packs);
+      // Usar paginação para buscar packs
+      const allPacks = await this.stickerlyClient.getRecommendedPacksWithPagination(locale);
+      const validPacks = this.stickerlyClient.filterValidPacks(allPacks);
 
       let successfulPacks = 0;
-      const maxPacks = Math.min(
-        validPacks.length,
-        config.scraping.maxPacksPerRun
-      );
+      let processedPacks = 0; // Contador de packs efetivamente processados
+      let consecutiveExisting = 0; // Contador de packs consecutivos existentes
+      const maxConsecutiveExisting = 10; // Parar após 10 packs consecutivos existentes
+      
+      const targetNewPacks = config.scraping.maxPacksPerRun;
 
-      info(`Processando ${maxPacks} packs recomendados`, { locale });
+      info(`Processando packs recomendados`, { 
+        locale,
+        availablePacks: validPacks.length,
+        targetNewPacks: targetNewPacks
+      });
 
-      for (let i = 0; i < maxPacks; i++) {
+      for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
         const pack = validPacks[i];
 
         try {
+          // Verificar se já foi processado nesta sessão
+          if (this.processedPacks.has(pack.packId)) {
+            consecutiveExisting++;
+            continue;
+          }
+
+          // Verificar se já existe no banco ANTES de processar
+          const existingPackId = await this.supabaseClient.packExists(pack.packId);
+          if (existingPackId) {
+            info(`Pack já existe no banco: ${pack.packId}`);
+            consecutiveExisting++;
+            
+            // Se muitos packs consecutivos já existem, parar para economizar recursos
+            if (consecutiveExisting >= maxConsecutiveExisting) {
+              info(`Parando: ${consecutiveExisting} packs consecutivos já existem`, {
+                locale,
+                processedIndex: i,
+                remainingPacks: validPacks.length - i - 1
+              });
+              break;
+            }
+            continue;
+          }
+
+          // Reset contador se encontrou pack novo
+          consecutiveExisting = 0;
+
+          // Processar pack efetivamente
           const success = await this.processPack(pack, locale);
+          processedPacks++;
+          
           if (success) {
             successfulPacks++;
+            info(`Pack processado com sucesso (${successfulPacks}/${targetNewPacks})`, {
+              packId: pack.packId,
+              packName: pack.name
+            });
           }
 
           // Delay entre packs
           await this.stickerlyClient.delay();
         } catch (err) {
           error(`Erro ao processar pack recomendado: ${pack.packId}`, err);
+          processedPacks++;
         }
       }
 
-      scrapingEnd(locale, maxPacks, successfulPacks);
+      scrapingEnd(locale, processedPacks, successfulPacks);
+
+      // Log final detalhado
+      info(`Resultado para ${locale}:`, {
+        total: processedPacks,
+        successful: successfulPacks,
+        failed: processedPacks - successfulPacks,
+        availablePacks: validPacks.length,
+        skippedExisting: validPacks.length - processedPacks
+      });
 
       // Atualizar estatísticas
       await this.supabaseClient.updateStats(
         "recommended_packs_processed",
-        maxPacks
+        processedPacks
       );
       await this.supabaseClient.updateStats(
         "recommended_packs_success",
@@ -368,9 +418,9 @@ class PackProcessor {
       );
 
       return {
-        total: maxPacks,
+        total: processedPacks,
         successful: successfulPacks,
-        failed: maxPacks - successfulPacks,
+        failed: processedPacks - successfulPacks,
       };
     } catch (err) {
       error(`Erro no processamento de packs recomendados`, err, { locale });

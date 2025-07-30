@@ -52,14 +52,22 @@ class StickerlyClient {
   }
 
   /**
-   * Busca packs recomendados por locale
+   * Busca packs recomendados por locale (com paginação opcional)
    */
-  async getRecommendedPacks(locale = 'pt-BR') {
-    info(`Buscando packs recomendados para locale: ${locale}`);
+  async getRecommendedPacks(locale = 'pt-BR', cursor = 0) {
+    info(`Buscando packs recomendados para locale: ${locale}, cursor: ${cursor}`);
+    
+    let url = config.scraping.apiUrls.recommend;
+    
+    // Adicionar cursor se maior que 0
+    if (cursor > 0) {
+      const separator = url.includes('?') ? '&' : '?';
+      url += `${separator}cursor=${cursor}`;
+    }
     
     const requestConfig = {
       method: 'GET',
-      url: config.scraping.apiUrls.recommend,
+      url: url,
       headers: {
         ...this.defaultHeaders,
         'User-Agent': this.getUserAgent(locale)
@@ -71,14 +79,18 @@ class StickerlyClient {
       const data = await this.makeRequest(requestConfig);
       
       if (data && data.result && data.result.packs) {
-        info(`Encontrados ${data.result.packs.length} packs recomendados`, { locale });
+        info(`Encontrados ${data.result.packs.length} packs recomendados`, { 
+          locale, 
+          cursor,
+          count: data.result.packs.length 
+        });
         return data.result.packs;
       }
       
-      warn('Resposta sem packs na estrutura esperada', { locale, data });
+      warn('Resposta sem packs na estrutura esperada', { locale, cursor, data });
       return [];
     } catch (err) {
-      error('Erro ao buscar packs recomendados', err, { locale });
+      error('Erro ao buscar packs recomendados', err, { locale, cursor });
       return [];
     }
   }
@@ -174,6 +186,73 @@ class StickerlyClient {
       locale,
       totalPacks: allPacks.length,
       pagesScraped: cursor
+    });
+
+    return allPacks;
+  }
+
+  /**
+   * Busca todos os packs recomendados com paginação
+   */
+  async getRecommendedPacksWithPagination(locale = 'pt-BR', maxPages = null) {
+    if (!config.scraping.recommendedPacksPaginationEnabled) {
+      info('Paginação de packs recomendados desabilitada, usando método simples');
+      return await this.getRecommendedPacks(locale, 0);
+    }
+
+    const actualMaxPages = maxPages || config.scraping.maxPagesPerRun;
+    info(`Iniciando busca paginada de packs recomendados`, { 
+      locale, 
+      maxPages: actualMaxPages 
+    });
+    
+    let allPacks = [];
+    let cursor = 0;
+    let emptyResponses = 0;
+    const maxEmptyResponses = config.scraping.maxEmptyPagesConsecutive;
+
+    while (cursor < actualMaxPages && emptyResponses < maxEmptyResponses) {
+      try {
+        const packs = await this.getRecommendedPacks(locale, cursor);
+        
+        if (packs.length === 0) {
+          emptyResponses++;
+          info(`Página vazia encontrada (${emptyResponses}/${maxEmptyResponses})`, { 
+            locale, 
+            cursor 
+          });
+          
+          // Se é a primeira página e está vazia, algo está errado
+          if (cursor === 0) {
+            warn('Primeira página de recomendados está vazia', { locale });
+            break;
+          }
+        } else {
+          emptyResponses = 0; // Reset contador se encontrou packs
+          allPacks = allPacks.concat(packs);
+          
+          info(`Página ${cursor}: ${packs.length} packs recomendados`, {
+            locale,
+            cursor,
+            totalSoFar: allPacks.length
+          });
+        }
+        
+        cursor++;
+        await this.delay();
+        
+      } catch (err) {
+        error(`Erro na página ${cursor} de recomendados`, err, { locale });
+        emptyResponses++;
+        cursor++;
+      }
+    }
+
+    info(`Busca paginada de recomendados finalizada`, {
+      locale,
+      totalPacks: allPacks.length,
+      pagesScraped: cursor,
+      stoppedReason: cursor >= actualMaxPages ? 'max_pages_reached' : 'empty_pages_limit'
     });
 
     return allPacks;
