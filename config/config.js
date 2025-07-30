@@ -15,10 +15,7 @@ const config = {
     
     // Locales baseados no código original
     locales: [
-      { locale: 'pt-BR', lang: 'pt' },
-      { locale: 'en-US', lang: 'en' },
-      { locale: 'es-ES', lang: 'es' },
-      { locale: 'fr-FR', lang: 'fr' }
+      { locale: 'pt-BR', lang: 'pt' }
     ],
     
     // User-Agent para requests
