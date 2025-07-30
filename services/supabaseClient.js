@@ -54,7 +54,7 @@ class SupabaseClient {
           identifier: packData.identifier,
           name: packData.name.replace(/'/g, ""), // Remove aspas para evitar problemas SQL
           publisher: packData.publisher || '',
-          tray: packData.tray || 'tray.webp',
+          tray: 'tray.png',
           zip_size: packData.zip_size || 0,
           is_animated: packData.is_animated || false,
           downloads: 0,

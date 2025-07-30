@@ -268,7 +268,7 @@ class PackProcessor {
     // Retornar dados no formato esperado
     return {
       stickersWithStatus: stickersWithStatus,
-      trayImage: trayImage,
+      trayImage: "tray.png", // Sempre usar nome padrão
     };
   }
 
