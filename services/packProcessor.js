@@ -22,6 +22,8 @@ class PackProcessor {
     this.supabaseClient = new SupabaseClient();
     this.processedPacks = new Set();
     this.failedPacks = new Set();
+    this.existingPackIds = new Set(); // Cache de IDs existentes
+    this.cacheLoaded = false;
   }
 
   /**
@@ -135,6 +137,10 @@ class PackProcessor {
 
       if (dbPackId) {
         this.processedPacks.add(packId);
+        // Atualizar cache com novo pack adicionado
+        if (this.cacheLoaded) {
+          this.existingPackIds.add(packId);
+        }
         packProcessed(packId, validStickers.length, true);
 
         info(`Upload concluído com sucesso`, {
@@ -320,6 +326,36 @@ class PackProcessor {
   }
 
   /**
+   * Carrega todos os IDs de packs existentes no banco para cache
+   */
+  async loadExistingPackIds() {
+    if (this.cacheLoaded) return;
+    
+    try {
+      info('Carregando cache de IDs existentes...');
+      const existingIds = await this.supabaseClient.getAllPackIds();
+      this.existingPackIds = new Set(existingIds);
+      this.cacheLoaded = true;
+      info(`Cache carregado: ${this.existingPackIds.size} packs existentes`);
+    } catch (err) {
+      error('Erro ao carregar cache de IDs', err);
+      // Fallback para verificação individual
+      this.cacheLoaded = false;
+    }
+  }
+
+  /**
+   * Verifica se pack existe (usa cache se disponível)
+   */
+  async packExistsOptimized(packId) {
+    if (this.cacheLoaded) {
+      return this.existingPackIds.has(packId);
+    }
+    // Fallback para verificação individual
+    return await this.supabaseClient.packExists(packId);
+  }
+
+  /**
    * Processa packs recomendados por locale com paginação inteligente
    */
   async processRecommendedPacks(locale = "pt-BR") {
@@ -327,6 +363,9 @@ class PackProcessor {
 
     try {
       scrapingStart(locale);
+      
+      // Carregar cache de IDs existentes
+      await this.loadExistingPackIds();
 
       // Usar paginação para buscar packs
       const allPacks = await this.stickerlyClient.getRecommendedPacksWithPagination(locale);
@@ -335,7 +374,6 @@ class PackProcessor {
       let successfulPacks = 0;
       let processedPacks = 0; // Contador de packs efetivamente processados
       let consecutiveExisting = 0; // Contador de packs consecutivos existentes
-      const maxConsecutiveExisting = 10; // Parar após 10 packs consecutivos existentes
       
       const targetNewPacks = config.scraping.maxPacksPerRun;
 
@@ -355,21 +393,11 @@ class PackProcessor {
             continue;
           }
 
-          // Verificar se já existe no banco ANTES de processar
-          const existingPackId = await this.supabaseClient.packExists(pack.packId);
+          // Verificar se já existe no banco ANTES de processar (usando cache otimizado)
+          const existingPackId = await this.packExistsOptimized(pack.packId);
           if (existingPackId) {
             info(`Pack já existe no banco: ${pack.packId}`);
             consecutiveExisting++;
-            
-            // Se muitos packs consecutivos já existem, parar para economizar recursos
-            if (consecutiveExisting >= maxConsecutiveExisting) {
-              info(`Parando: ${consecutiveExisting} packs consecutivos já existem`, {
-                locale,
-                processedIndex: i,
-                remainingPacks: validPacks.length - i - 1
-              });
-              break;
-            }
             continue;
           }
 

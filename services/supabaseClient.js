@@ -42,6 +42,26 @@ class SupabaseClient {
   }
 
   /**
+   * Retorna todos os IDs de packs existentes (para cache)
+   */
+  async getAllPackIds() {
+    try {
+      const { data, error: queryError } = await this.supabase
+        .from('packs')
+        .select('identifier');
+
+      if (queryError) {
+        throw queryError;
+      }
+
+      return data ? data.map(pack => pack.identifier) : [];
+    } catch (err) {
+      error('Erro ao buscar todos os IDs de packs', err);
+      return [];
+    }
+  }
+
+  /**
    * Cria novo pack no banco de dados
    */
   async createPack(packData) {
