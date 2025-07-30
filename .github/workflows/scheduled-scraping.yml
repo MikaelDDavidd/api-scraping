@@ -14,13 +14,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Debug - List files
+      run: |
+        pwd
+        ls -la
+        ls -la package*
+        
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         
     - name: Install dependencies
-      run: npm ci
+      run: npm install
       
     - name: Create logs directory
       run: mkdir -p logs
