@@ -18,10 +18,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
         
     - name: Install dependencies
       run: npm ci
+      
+    - name: Create logs directory
+      run: mkdir -p logs
       
     - name: Run sticker scraping
       env:
@@ -42,6 +44,7 @@ jobs:
         name: scraping-logs-${{ github.run_number }}
         path: logs/
         retention-days: 7
+        if-no-files-found: ignore
         
     - name: Notify on failure
       if: failure()
