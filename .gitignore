@@ -22,7 +22,7 @@ temp/
 
 # Data files
 data_captured/
-*.json
+data_captured/*.json
 
 # OS generated files
 .DS_Store
