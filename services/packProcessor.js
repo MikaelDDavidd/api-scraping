@@ -556,8 +556,7 @@ class PackProcessor {
           totalSuccessful: totalSuccessful
         });
 
-        // Delay entre keywords
-        await this.stickerlyClient.delay(3000);
+        // ⭐ SEM DELAY entre keywords como API original
       } catch (err) {
         error(`Erro ao processar keyword: ${keyword}`, err, { locale });
       }
@@ -632,6 +631,13 @@ class PackProcessor {
             results.summary.failed += keywordResult.failed;
           }
           
+          // ⭐ DELAY entre locales como API original (4 segundos)
+          const localeIndex = config.scraping.locales.findIndex(l => l.locale === locale);
+          if (localeIndex < config.scraping.locales.length - 1) {
+            info(`Delay de 4 segundos antes do próximo locale...`);
+            await this.stickerlyClient.delay(4000);
+          }
+          
         } catch (err) {
           error(`Erro no scraping de locale: ${locale}`, err);
         }
@@ -662,6 +668,34 @@ class PackProcessor {
       error("Erro no scraping completo", err);
       throw err;
     }
+  }
+
+  /**
+   * Inicia scraping contínuo (como na API original)
+   */
+  async startContinuousScraping(keywords = []) {
+    info('🔄 Iniciando scraping contínuo (como API original)');
+    
+    const runScraping = async () => {
+      try {
+        info('🚀 Executando ciclo de scraping...');
+        const result = await this.runFullScraping(keywords);
+        
+        info('✅ Ciclo de scraping concluído', {
+          summary: result.summary,
+          nextCycleIn: '10 segundos'
+        });
+        
+      } catch (err) {
+        error('❌ Erro no ciclo de scraping contínuo', err);
+      }
+      
+      // ⭐ RECURSÃO AUTOMÁTICA como API original (10 segundos)
+      setTimeout(runScraping, 10 * 1000);
+    };
+    
+    // Iniciar o primeiro ciclo
+    runScraping();
   }
 
   /**
@@ -758,9 +792,13 @@ class PackProcessor {
           return validExtensions.includes(ext);
         });
         
-        // Se ainda restam pelo menos 3 arquivos válidos, usar apenas os válidos
+        // ⭐ ESTRATÉGIA como API original: Sempre tenta processar se tem arquivos válidos
         if (validFiles.length >= 3) {
           info(`Pack ${pack.packId}: Filtrando arquivos inválidos (${validFiles.length}/${pack.resourceFiles.length} válidos)`);
+          pack.resourceFiles = validFiles;
+        } else if (validFiles.length > 0) {
+          // ⭐ MENOS DE 3 mas tem alguns válidos: tenta processar mesmo assim
+          warn(`Pack ${pack.packId}: Apenas ${validFiles.length} arquivos válidos, tentando processar mesmo assim`);
           pack.resourceFiles = validFiles;
         } else {
           return false;

@@ -132,6 +132,20 @@ async function main() {
         info('Resultado do teste:', testResult);
         break;
 
+      case 'continuous':
+        // ⭐ NOVO: Modo contínuo como API original
+        const continuousKeywords = args.slice(1);
+        const keywordsForContinuous = continuousKeywords.length > 0 ? continuousKeywords : config.scraping.keywords;
+        
+        info(`🔄 Modo: Scraping contínuo (como API original)`);
+        info(`Keywords: ${keywordsForContinuous.join(', ')}`);
+        info(`Locales: ${config.scraping.locales.map(l => l.locale).join(', ')}`);
+        info(`⚠️  Pressione Ctrl+C para parar`);
+        
+        // Inicia o scraping contínuo (nunca termina)
+        await processor.startContinuousScraping(keywordsForContinuous);
+        return; // Nunca chegará aqui
+
       case 'stats':
         // Mostrar estatísticas da sessão
         const stats = processor.getSessionStats();
@@ -177,6 +191,7 @@ Comandos disponíveis:
   recommended           Processa apenas packs recomendados
   keywords [palavras]   Processa apenas por busca de keywords
   full [palavras]       Processamento completo (recomendados + keywords)
+  continuous [palavras] ⭐ Scraping contínuo (como API original) - roda infinitamente
   test                  Modo de teste (1 pack por locale)
   stats                 Mostra estatísticas da sessão atual
   help, --help, -h      Mostra esta ajuda
@@ -186,6 +201,8 @@ Exemplos:
   node index.js recommended               # Apenas packs recomendados
   node index.js keywords memes funny      # Busca por "memes" e "funny"
   node index.js full amor trabalho        # Completo com keywords customizadas
+  node index.js continuous                # ⭐ Scraping contínuo (recomendado para produção)
+  node index.js continuous memes love     # Scraping contínuo com keywords específicas
   node index.js test                      # Teste rápido
 
 Configuração:

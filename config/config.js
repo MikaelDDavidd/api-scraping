@@ -18,20 +18,26 @@ const config = {
     maxPacksPerKeyword: parseInt(process.env.MAX_PACKS_PER_KEYWORD) || 62,   // Como na API original
     maxEmptyPagesConsecutive: parseInt(process.env.MAX_EMPTY_PAGES_CONSECUTIVE) || 3,
     
-    // Estratégia: recommend SEM paginação + search COM paginação
+    // Estratégia: recommend SEM paginação + search COM paginação (como API original)
     useRecommendedPacks: process.env.USE_RECOMMENDED_PACKS !== 'false',
-    useKeywordSearch: process.env.USE_KEYWORD_SEARCH !== 'false',
+    useKeywordSearch: true, // ⭐ SEMPRE ATIVO como na API original
     
-    // Locales baseados no código original
+    // Locales baseados no código original (expandidos)
     locales: [
-      { locale: 'pt-BR', lang: 'pt' }
+      { locale: 'pt-BR', lang: 'pt' },
+      { locale: 'en-US', lang: 'en' },
+      { locale: 'es-ES', lang: 'es' },
+      { locale: 'fr-FR', lang: 'fr' }
     ],
     
     // User-Agent para requests (dinâmico como API original)
     userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; {locale};)',
     
-    // Keywords para busca (como na API original)
-    keywords: ['memes', 'funny', 'love', 'sad', 'happy', 'angry', 'work', 'brasil', 'futebol', 'carnaval'],
+    // Keywords para busca (expandidas como na API original)
+    keywords: [
+      'memes', 'funny', 'love', 'sad', 'happy', 'angry', 'work', 'brasil', 'futebol', 'carnaval',
+      'bruxelas', 'cats', 'dogs', 'food', 'music', 'party', 'travel', 'cute', 'stickers', 'emoji'
+    ],
     
     // Device IDs para rotação (para diversificar resultados)
     deviceIds: [

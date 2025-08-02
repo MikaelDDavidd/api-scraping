@@ -97,6 +97,9 @@ class StickerlyClient {
     try {
       const data = await this.makeRequest(requestConfig);
       
+      // ⭐ SALVAR RESPONSE como API original
+      await this.saveResponseToFile(data, 'recommend', locale, cursor);
+      
       if (data && data.result && data.result.packs) {
         info(`Encontrados ${data.result.packs.length} packs recomendados`, { 
           locale, 
@@ -138,6 +141,9 @@ class StickerlyClient {
 
     try {
       const data = await this.makeRequest(requestConfig);
+      
+      // ⭐ SALVAR RESPONSE como API original
+      await this.saveResponseToFile(data, 'search', locale, cursor, keyword);
       
       if (data && data.result && data.result.stickerPacks) {
         const packs = data.result.stickerPacks;
@@ -188,15 +194,40 @@ class StickerlyClient {
           });
         } else {
           emptyResponses = 0; // Reset contador se encontrou packs
-          allPacks = allPacks.concat(packs);
           
-          // Filtrar apenas packs animados se configurado
-          const animatedPacks = packs.filter(pack => pack.isAnimated);
-          info(`Página ${cursor}: ${packs.length} packs (${animatedPacks.length} animados)`, {
+          // ⭐ FILTRO PROGRESSIVO como API original: primeira página aceita todos, outras só animados
+          let packsAdded = 0;
+          let animatedCount = 0;
+          
+          for (let i = 0; i < packs.length; i++) {
+            const pack = packs[i];
+            
+            // Primeira página (cursor 0): aceita todos | Outras páginas: só animados
+            if (cursor === 0 || pack.isAnimated) {
+              allPacks.push(pack);
+              packsAdded++;
+              
+              if (pack.isAnimated) {
+                animatedCount++;
+              }
+            }
+          }
+          
+          // ⭐ LOG DETALHADO como API original
+          info("-------------- STATUS -------------");
+          info(`keyword: ${keyword}`);
+          info(`total stickers: ${allPacks.length}`);
+          info(`cursor: ${cursor}`);
+          info(`animated stickers: ${animatedCount}`);
+          info(`page added: ${packsAdded}/${packs.length}`);
+          info("--------------------------------------");
+          
+          info(`Página ${cursor}: ${packsAdded}/${packs.length} packs adicionados (${animatedCount} animados)`, {
             keyword,
             cursor,
             locale,
-            totalSoFar: allPacks.length
+            totalSoFar: allPacks.length,
+            filtered: cursor > 0 ? packs.length - packsAdded : 0
           });
           
           // Limite por keyword como na API original
@@ -325,6 +356,43 @@ class StickerlyClient {
     });
 
     return validPacks;
+  }
+
+  /**
+   * Salva response em arquivo como na API original
+   */
+  async saveResponseToFile(data, type, locale, cursor, keyword = '') {
+    try {
+      const fs = require('fs-extra');
+      const path = require('path');
+      
+      // Garantir que diretório existe
+      const dataDir = config.storage?.dataDir || './data_captured';
+      await fs.ensureDir(dataDir);
+      
+      // Criar nome do arquivo como na API original
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = keyword ? 
+        `sticker.ly_${type}_${keyword}_${locale}_${cursor}_${timestamp}.json` :
+        `sticker.ly_${type}_${locale}_${cursor}_${timestamp}.json`;
+      
+      const filepath = path.join(dataDir, filename);
+      
+      // Salvar dados
+      await fs.writeJSON(filepath, data, { spaces: 2 });
+      
+      info(`Response salvo`, {
+        type,
+        locale,
+        cursor,
+        keyword: keyword || 'none',
+        filename,
+        dataSize: JSON.stringify(data).length
+      });
+      
+    } catch (err) {
+      error('Erro ao salvar response', err, { type, locale, cursor, keyword });
+    }
   }
 }
 
