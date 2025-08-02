@@ -5,20 +5,37 @@ const { info, error, warn } = require('../utils/logger');
 class StickerlyClient {
   constructor() {
     this.baseURL = 'http://api.sticker.ly';
+    this.deviceIdIndex = 0; // Para rotação de device IDs
     this.defaultHeaders = {
       'Connection': 'Keep-Alive',
       'Host': 'api.sticker.ly',
-      'x-duid': '20fa5a958492bbd3',
       'Accept-Encoding': 'gzip'
     };
   }
 
   /**
-   * Retorna o User-Agent fixo (como na API original)
+   * Obtém próximo device ID da rotação
+   */
+  getNextDeviceId() {
+    const deviceId = config.scraping.deviceIds[this.deviceIdIndex];
+    this.deviceIdIndex = (this.deviceIdIndex + 1) % config.scraping.deviceIds.length;
+    return deviceId;
+  }
+
+  /**
+   * Cria o User-Agent baseado no locale (como na API original)
    */
   getUserAgent(locale = 'pt-BR') {
-    // API original sempre usa 'br' independente do locale
-    return config.scraping.userAgent;
+    // Converter locale para formato da API original
+    const localeMap = {
+      'pt-BR': 'br',
+      'en-US': 'en', 
+      'es-ES': 'es',
+      'fr-FR': 'fr'
+    };
+    
+    const shortLocale = localeMap[locale] || 'br';
+    return config.scraping.userAgent.replace('{locale}', shortLocale);
   }
 
   /**
@@ -71,6 +88,7 @@ class StickerlyClient {
       url: url,
       headers: {
         ...this.defaultHeaders,
+        'x-duid': this.getNextDeviceId(), // Rotacionar device ID
         'User-Agent': this.getUserAgent(locale)
       },
       timeout: 30000
@@ -107,6 +125,7 @@ class StickerlyClient {
       url: config.scraping.apiUrls.search,
       headers: {
         ...this.defaultHeaders,
+        'x-duid': this.getNextDeviceId(), // Rotacionar device ID
         'User-Agent': this.getUserAgent(locale),
         'Content-Type': 'application/json'
       },
@@ -247,7 +266,8 @@ class StickerlyClient {
       responseType: 'arraybuffer',
       timeout: 60000, // 60 segundos para downloads
       headers: {
-        'User-Agent': this.getUserAgent()
+        'User-Agent': this.getUserAgent(),
+        'x-duid': this.getNextDeviceId() // Rotacionar device ID mesmo para downloads
       }
     };
 

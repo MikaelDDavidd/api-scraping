@@ -731,7 +731,14 @@ class PackProcessor {
       // 5. Validar formatos de arquivo aceitos
       const validExtensions = [".webp", ".png", ".gif"];
       const invalidFiles = pack.resourceFiles.filter((file) => {
-        const ext = file.toLowerCase().substring(file.lastIndexOf("."));
+        const lastDotIndex = file.toLowerCase().lastIndexOf(".");
+        
+        // Se não tem extensão, considerar inválido
+        if (lastDotIndex === -1) {
+          return true;
+        }
+        
+        const ext = file.toLowerCase().substring(lastDotIndex);
         return !validExtensions.includes(ext);
       });
 
@@ -739,8 +746,25 @@ class PackProcessor {
         warn(`Pack contém arquivos com formato inválido`, {
           packId: pack.packId,
           invalidFiles: invalidFiles.slice(0, 3), // Mostrar apenas os primeiros 3
+          totalInvalid: invalidFiles.length,
+          totalFiles: pack.resourceFiles.length
         });
-        return false;
+        
+        // Se a maioria dos arquivos é válida, filtrar apenas os inválidos
+        const validFiles = pack.resourceFiles.filter((file) => {
+          const lastDotIndex = file.toLowerCase().lastIndexOf(".");
+          if (lastDotIndex === -1) return false;
+          const ext = file.toLowerCase().substring(lastDotIndex);
+          return validExtensions.includes(ext);
+        });
+        
+        // Se ainda restam pelo menos 3 arquivos válidos, usar apenas os válidos
+        if (validFiles.length >= 3) {
+          info(`Pack ${pack.packId}: Filtrando arquivos inválidos (${validFiles.length}/${pack.resourceFiles.length} válidos)`);
+          pack.resourceFiles = validFiles;
+        } else {
+          return false;
+        }
       }
 
       info(`Pack passou na validação do WhatsApp`, {

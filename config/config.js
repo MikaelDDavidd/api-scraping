@@ -27,11 +27,19 @@ const config = {
       { locale: 'pt-BR', lang: 'pt' }
     ],
     
-    // User-Agent para requests (exato como API original)
-    userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; br;)',
+    // User-Agent para requests (dinâmico como API original)
+    userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; {locale};)',
     
     // Keywords para busca (como na API original)
     keywords: ['memes', 'funny', 'love', 'sad', 'happy', 'angry', 'work', 'brasil', 'futebol', 'carnaval'],
+    
+    // Device IDs para rotação (para diversificar resultados)
+    deviceIds: [
+      '20fa5a958492bbd3', // ID original
+      '30fb6b068593cce4', // IDs alternativos para diversificação
+      '40fc7c178694ddf5',
+      '50fd8d289795eef6'
+    ],
     
     // URLs da API do sticker.ly
     apiUrls: {
