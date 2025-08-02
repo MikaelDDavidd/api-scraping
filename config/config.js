@@ -22,21 +22,26 @@ const config = {
     useRecommendedPacks: process.env.USE_RECOMMENDED_PACKS !== 'false',
     useKeywordSearch: true, // ⭐ SEMPRE ATIVO como na API original
     
-    // Locales baseados no código original (expandidos)
+    // Locales - Focado apenas no Brasil
     locales: [
-      { locale: 'pt-BR', lang: 'pt' },
-      { locale: 'en-US', lang: 'en' },
-      { locale: 'es-ES', lang: 'es' },
-      { locale: 'fr-FR', lang: 'fr' }
+      { locale: 'pt-BR', lang: 'pt' }
     ],
     
     // User-Agent para requests (dinâmico como API original)
     userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; {locale};)',
     
-    // Keywords para busca (expandidas como na API original)
+    // Keywords combinadas (sticker.ly real + termos úteis brasileiros)
     keywords: [
-      'memes', 'funny', 'love', 'sad', 'happy', 'angry', 'work', 'brasil', 'futebol', 'carnaval',
-      'bruxelas', 'cats', 'dogs', 'food', 'music', 'party', 'travel', 'cute', 'stickers', 'emoji'
+      // 🔥 Pesquisas em alta (dados reais do sticker.ly)
+      'academia', 'flamengo', 'morango do amor', 'lula', 'bolsonaro', 'bom dia', 'chapolin',
+      
+      // 📂 Categorias oficiais
+      'musica', 'amor', 'meme', 'tiktok', 'floptok', 'fofo', 'desenhos', 'futebol', 'kpop',
+      
+      // 🇧🇷 Termos brasileiros úteis (nossa lista anterior)
+      'brasil', 'carnaval', 'trabalho', 'família', 'amigos', 'feliz', 'triste', 'raiva', 
+      'festa', 'natal', 'animado', 'brasileiro', 'whatsapp', 'engraçado', 'coração', 
+      'saudade', 'humor'
     ],
     
     // Device IDs para rotação (para diversificar resultados)
