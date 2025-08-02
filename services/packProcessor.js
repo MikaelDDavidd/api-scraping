@@ -351,108 +351,80 @@ class PackProcessor {
    */
   async packExistsOptimized(packId) {
     if (this.cacheLoaded) {
-      const exists = this.existingPackIds.has(packId);
-      // Debug: log apenas os primeiros 5 para não poluir
-      if (this.debugLogCount < 5) {
-        info(`Verificação cache: ${packId} -> ${exists ? 'EXISTE' : 'NOVO'}`, {
-          cacheSize: this.existingPackIds.size,
-          debugCount: this.debugLogCount
-        });
-        this.debugLogCount = (this.debugLogCount || 0) + 1;
-      }
-      return exists;
+      return this.existingPackIds.has(packId);
     }
     // Fallback para verificação individual
-    return await this.supabaseClient.packExists(packId);
+    const exists = await this.supabaseClient.packExists(packId);
+    return exists !== null;
   }
 
   /**
-   * Processa packs recomendados por locale com paginação inteligente
+   * Processa packs recomendados (sem paginação como na API original)
    */
   async processRecommendedPacks(locale = "pt-BR") {
-    const lang = this.getLanguageFromLocale(locale);
+    if (!config.scraping.useRecommendedPacks) {
+      info('Processamento de packs recomendados desabilitado');
+      return { total: 0, successful: 0, failed: 0 };
+    }
 
     try {
-      scrapingStart(locale);
+      info(`Processando packs recomendados (chamada única)`, { locale });
       
       // Carregar cache de IDs existentes
       await this.loadExistingPackIds();
 
-      let successfulPacks = 0;
-      let processedPacks = 0; // Contador de packs efetivamente processados
-      let consecutiveExisting = 0; // Contador de packs consecutivos existentes
-      let skippedExisting = 0; // Contador de packs já existentes
-      let cursor = 0;
-      let totalPacksFound = 0;
+      // Buscar packs recomendados (sem paginação)
+      const allPacks = await this.stickerlyClient.getRecommendedPacksSingle(locale);
+      const validPacks = this.stickerlyClient.filterValidPacks(allPacks);
       
-      const targetNewPacks = config.scraping.maxPacksPerRun;
-      const maxPages = config.scraping.maxPagesPerRun;
+      if (validPacks.length === 0) {
+        info('Nenhum pack recomendado encontrado', { locale });
+        return { total: 0, successful: 0, failed: 0 };
+      }
 
-      info(`Processando packs recomendados página por página`, { 
+      let successfulPacks = 0;
+      let processedPacks = 0;
+      let skippedExisting = 0;
+      const targetNewPacks = config.scraping.maxPacksPerRun;
+
+      info(`Processando ${validPacks.length} packs recomendados`, {
         locale,
-        targetNewPacks: targetNewPacks,
-        maxPages: maxPages,
-        cacheLoaded: this.cacheLoaded,
-        cachedPacksCount: this.existingPackIds.size
+        totalPacks: validPacks.length,
+        targetNewPacks
       });
 
-      // Processar página por página até atingir limite ou máximo de páginas
-      while (cursor < maxPages && successfulPacks < targetNewPacks) {
-        // Buscar uma página por vez
-        const pagePacks = await this.stickerlyClient.getRecommendedPacks(locale, cursor);
-        const validPacks = this.stickerlyClient.filterValidPacks(pagePacks);
-        
-        if (validPacks.length === 0) {
-          info(`Página ${cursor} vazia, parando`, { locale });
-          break;
-        }
-
-        totalPacksFound += validPacks.length;
-        info(`Processando página ${cursor}: ${validPacks.length} packs válidos`, {
-          locale,
-          cursor,
-          totalFound: totalPacksFound,
-          successfulSoFar: successfulPacks
-        });
-
-        // Processar packs da página atual
-        for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
+      // Processar todos os packs recomendados
+      for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
         const pack = validPacks[i];
 
         try {
           // Verificar se já foi processado nesta sessão
           if (this.processedPacks.has(pack.packId)) {
-            consecutiveExisting++;
-            continue;
-          }
-
-          // Verificar se já existe no banco ANTES de processar (usando cache otimizado)
-          const existingPackId = await this.packExistsOptimized(pack.packId);
-          if (existingPackId) {
-            info(`Pack já existe no banco: ${pack.packId}`);
-            consecutiveExisting++;
             skippedExisting++;
             continue;
           }
 
-          // Log detalhado quando encontra pack novo
-          info(`Pack NOVO encontrado: ${pack.packId}`, {
+          // Verificar se já existe no banco
+          const existingPackId = await this.packExistsOptimized(pack.packId);
+          if (existingPackId) {
+            skippedExisting++;
+            continue;
+          }
+
+          // Pack novo encontrado
+          info(`Pack NOVO recomendado: ${pack.packId}`, {
             packName: pack.name,
-            index: i,
-            consecutiveExisting,
-            skippedExisting
+            index: i + 1,
+            totalSkipped: skippedExisting
           });
 
-          // Reset contador se encontrou pack novo
-          consecutiveExisting = 0;
-
-          // Processar pack efetivamente
+          // Processar pack
           const success = await this.processPack(pack, locale);
           processedPacks++;
           
           if (success) {
             successfulPacks++;
-            info(`Pack processado com sucesso (${successfulPacks}/${targetNewPacks})`, {
+            info(`Pack recomendado processado (${successfulPacks}/${targetNewPacks})`, {
               packId: pack.packId,
               packName: pack.name
             });
@@ -464,37 +436,15 @@ class PackProcessor {
           error(`Erro ao processar pack recomendado: ${pack.packId}`, err);
           processedPacks++;
         }
-        }
-
-        // Delay entre páginas e incrementar cursor
-        cursor++;
-        if (cursor < maxPages && successfulPacks < targetNewPacks) {
-          await this.stickerlyClient.delay(1000); // Delay um pouco maior entre páginas
-        }
       }
 
-      scrapingEnd(locale, processedPacks, successfulPacks);
-
-      // Log final detalhado
-      info(`Resultado para ${locale}:`, {
+      info(`Resultado packs recomendados para ${locale}:`, {
         total: processedPacks,
         successful: successfulPacks,
         failed: processedPacks - successfulPacks,
-        totalPacksFound: totalPacksFound,
-        skippedExisting: skippedExisting,
-        newPacksFound: totalPacksFound - skippedExisting,
-        pagesProcessed: cursor
+        totalFound: validPacks.length,
+        skippedExisting: skippedExisting
       });
-
-      // Atualizar estatísticas
-      await this.supabaseClient.updateStats(
-        "recommended_packs_processed",
-        processedPacks
-      );
-      await this.supabaseClient.updateStats(
-        "recommended_packs_success",
-        successfulPacks
-      );
 
       return {
         total: processedPacks,
@@ -503,80 +453,127 @@ class PackProcessor {
       };
     } catch (err) {
       error(`Erro no processamento de packs recomendados`, err, { locale });
-      throw err;
+      return { total: 0, successful: 0, failed: 0 };
     }
   }
 
   /**
-   * Processa packs por busca de palavras-chave
+   * Processa packs por busca de palavras-chave (como na API original)
    */
   async processKeywordSearch(keywords = [], locale = "pt-BR") {
-    if (!Array.isArray(keywords) || keywords.length === 0) {
+    if (!config.scraping.useKeywordSearch) {
+      info('Busca por keywords desabilitada');
+      return { total: 0, successful: 0, failed: 0 };
+    }
+
+    // Usar keywords da configuração se não fornecidas
+    const keywordsToUse = keywords.length > 0 ? keywords : config.scraping.keywords;
+    
+    if (!Array.isArray(keywordsToUse) || keywordsToUse.length === 0) {
       warn("Lista de keywords vazia");
       return { total: 0, successful: 0, failed: 0 };
     }
 
+    // Carregar cache de IDs existentes
+    await this.loadExistingPackIds();
+    
     let totalProcessed = 0;
     let totalSuccessful = 0;
+    let totalSkipped = 0;
 
-    for (const keyword of keywords) {
+    info(`Iniciando busca por keywords`, {
+      locale,
+      keywords: keywordsToUse,
+      totalKeywords: keywordsToUse.length
+    });
+
+    for (const keyword of keywordsToUse) {
       try {
         info(`Processando keyword: ${keyword}`, { locale });
 
-        const packs = await this.stickerlyClient.searchAllPacks(
-          keyword,
-          locale
-        );
+        // Buscar todos os packs para esta keyword (com paginação)
+        const packs = await this.stickerlyClient.searchAllPacks(keyword, locale);
         const validPacks = this.stickerlyClient.filterValidPacks(packs);
 
-        let successfulPacks = 0;
-        const maxPacks = Math.min(
-          validPacks.length,
-          config.scraping.maxPacksPerRun
-        );
+        if (validPacks.length === 0) {
+          info(`Nenhum pack encontrado para keyword: ${keyword}`);
+          continue;
+        }
 
-        for (let i = 0; i < maxPacks; i++) {
+        let keywordProcessed = 0;
+        let keywordSuccessful = 0;
+        let keywordSkipped = 0;
+        const maxPacksPerKeyword = config.scraping.maxPacksPerKeyword;
+
+        // Processar packs desta keyword
+        for (let i = 0; i < Math.min(validPacks.length, maxPacksPerKeyword); i++) {
           const pack = validPacks[i];
 
           try {
-            const success = await this.processPack(pack, locale);
-            if (success) {
-              successfulPacks++;
+            // Verificar se já foi processado
+            if (this.processedPacks.has(pack.packId)) {
+              keywordSkipped++;
+              continue;
             }
 
-            totalProcessed++;
+            // Verificar se já existe no banco
+            const existingPackId = await this.packExistsOptimized(pack.packId);
+            if (existingPackId) {
+              keywordSkipped++;
+              continue;
+            }
+
+            // Processar pack novo
+            const success = await this.processPack(pack, locale);
+            keywordProcessed++;
+            
+            if (success) {
+              keywordSuccessful++;
+              info(`Pack keyword processado: ${pack.packId}`, {
+                keyword,
+                packName: pack.name,
+                keywordSuccess: keywordSuccessful
+              });
+            }
+
             await this.stickerlyClient.delay();
           } catch (err) {
-            error(`Erro ao processar pack de busca: ${pack.packId}`, err);
+            error(`Erro ao processar pack de keyword: ${pack.packId}`, err);
+            keywordProcessed++;
           }
         }
 
-        totalSuccessful += successfulPacks;
+        totalProcessed += keywordProcessed;
+        totalSuccessful += keywordSuccessful;
+        totalSkipped += keywordSkipped;
 
-        info(`Keyword processada`, {
-          keyword,
+        info(`Keyword processada: ${keyword}`, {
           locale,
           packsFound: validPacks.length,
-          packsProcessed: maxPacks,
-          successful: successfulPacks,
+          packsProcessed: keywordProcessed,
+          successful: keywordSuccessful,
+          skipped: keywordSkipped,
+          totalSuccessful: totalSuccessful
         });
 
         // Delay entre keywords
-        await this.stickerlyClient.delay(5000);
+        await this.stickerlyClient.delay(3000);
       } catch (err) {
         error(`Erro ao processar keyword: ${keyword}`, err, { locale });
       }
     }
 
     // Atualizar estatísticas
-    await this.supabaseClient.updateStats(
-      "keyword_packs_processed",
-      totalProcessed
-    );
-    await this.supabaseClient.updateStats(
-      "keyword_packs_success",
-      totalSuccessful
-    );
+    await this.supabaseClient.updateStats("keyword_packs_processed", totalProcessed);
+    await this.supabaseClient.updateStats("keyword_packs_success", totalSuccessful);
+
+    info(`Resultado busca por keywords para ${locale}:`, {
+      totalKeywords: keywordsToUse.length,
+      totalProcessed,
+      totalSuccessful,
+      totalFailed: totalProcessed - totalSuccessful,
+      totalSkipped
+    });
 
     return {
       total: totalProcessed,
@@ -598,48 +595,56 @@ class PackProcessor {
     try {
       info("Iniciando scraping completo");
 
-      // 1. Processar packs recomendados por locale
+      // Processar por locale usando estratégia dupla (como API original)
       for (const localeConfig of config.scraping.locales) {
+        const locale = localeConfig.locale;
+        
         try {
-          const result = await this.processRecommendedPacks(
-            localeConfig.locale
-          );
-          results.locales[localeConfig.locale] = result;
-
-          results.summary.total += result.total;
-          results.summary.successful += result.successful;
-          results.summary.failed += result.failed;
-        } catch (err) {
-          error(`Erro no scraping de locale: ${localeConfig.locale}`, err);
-        }
-      }
-
-      // 2. Processar keywords se fornecidas
-      if (keywords.length > 0) {
-        for (const localeConfig of config.scraping.locales) {
-          try {
-            const result = await this.processKeywordSearch(
-              keywords,
-              localeConfig.locale
-            );
-
-            if (!results.keywords[localeConfig.locale]) {
-              results.keywords[localeConfig.locale] = result;
+          // 1. Packs recomendados (sem paginação)
+          if (config.scraping.useRecommendedPacks) {
+            const recommendedResult = await this.processRecommendedPacks(locale);
+            
+            if (!results.locales[locale]) {
+              results.locales[locale] = { recommended: {}, keywords: {} };
             }
+            results.locales[locale].recommended = recommendedResult;
 
-            results.summary.total += result.total;
-            results.summary.successful += result.successful;
-            results.summary.failed += result.failed;
-          } catch (err) {
-            error(
-              `Erro no scraping de keywords para locale: ${localeConfig.locale}`,
-              err
-            );
+            results.summary.total += recommendedResult.total;
+            results.summary.successful += recommendedResult.successful;
+            results.summary.failed += recommendedResult.failed;
           }
+
+          // 2. Busca por keywords (com paginação)
+          if (config.scraping.useKeywordSearch) {
+            const keywordResult = await this.processKeywordSearch(keywords, locale);
+            
+            if (!results.locales[locale]) {
+              results.locales[locale] = { recommended: {}, keywords: {} };
+            }
+            
+            if (!results.keywords[locale]) {
+              results.keywords[locale] = keywordResult;
+            }
+            results.locales[locale].keywords = keywordResult;
+
+            results.summary.total += keywordResult.total;
+            results.summary.successful += keywordResult.successful;
+            results.summary.failed += keywordResult.failed;
+          }
+          
+        } catch (err) {
+          error(`Erro no scraping de locale: ${locale}`, err);
         }
       }
 
-      info("Scraping completo finalizado", results.summary);
+      info("Scraping completo finalizado (estratégia dupla)", {
+        ...results.summary,
+        strategy: {
+          recommendedPacks: config.scraping.useRecommendedPacks,
+          keywordSearch: config.scraping.useKeywordSearch,
+          keywordsUsed: config.scraping.keywords
+        }
+      });
 
       // Atualizar estatísticas finais
       await this.supabaseClient.updateStats("total_scraping_runs", 1);

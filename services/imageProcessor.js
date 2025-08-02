@@ -122,8 +122,24 @@ class ImageProcessor {
           
           // Tentar recompressão com qualidade menor
           if (actuallyAnimated && isAnimated) {
-            // Para animados, tentar reduzir qualidade mantendo animação
-            await this.resizeAnimatedWebP(tempInputPath, tempOutputPath, 60);
+            // Para animados, implementar compressão agressiva em múltiplas tentativas
+            let attempts = 0;
+            const maxAttempts = 3;
+            const qualities = [60, 45, 30]; // Qualidades progressivamente menores
+            
+            while (outputBuffer.length > maxSize && attempts < maxAttempts) {
+              const quality = qualities[attempts];
+              info(`Tentativa ${attempts + 1}: compressão agressiva com qualidade ${quality}`, {
+                filename: outputFilename,
+                packId,
+                currentSize: outputBuffer.length,
+                targetSize: maxSize
+              });
+              
+              await this.resizeAnimatedWebPAggressive(tempInputPath, tempOutputPath, quality, maxSize);
+              outputBuffer = await fs.readFile(tempOutputPath);
+              attempts++;
+            }
           } else {
             // Para estáticos, recompressão normal
             const lowerQuality = Math.max(50, config.image.quality - 20);
@@ -133,9 +149,8 @@ class ImageProcessor {
               tempInputPath,
               '-o', tempOutputPath
             ]);
+            outputBuffer = await fs.readFile(tempOutputPath);
           }
-          
-          outputBuffer = await fs.readFile(tempOutputPath);
           
           if (outputBuffer.length > maxSize) {
             throw new Error(`Sticker muito grande mesmo após recompressão: ${outputBuffer.length} bytes`);
@@ -529,6 +544,93 @@ class ImageProcessor {
       // Fallback: processar como estático
       await execFileAsync('cwebp', [
         '-q', quality.toString(),
+        '-resize', '512', '512',
+        inputPath,
+        '-o', outputPath
+      ]);
+    }
+  }
+
+  /**
+   * Compressão agressiva para WebP animados grandes
+   */
+  async resizeAnimatedWebPAggressive(inputPath, outputPath, quality, targetSize) {
+    try {
+      const info = await this.getWebPInfo(inputPath);
+      
+      if (info.totalFrames <= 1) {
+        await execFileAsync('cwebp', [
+          '-q', quality.toString(),
+          '-resize', '512', '512',
+          inputPath,
+          '-o', outputPath
+        ]);
+        return;
+      }
+      
+      const frameDir = path.join(this.tempDir, `aggressive_frames_${Date.now()}`);
+      await fs.ensureDir(frameDir);
+      
+      try {
+        let frameSkip = 1; // Começar sem pular frames
+        
+        // Se tem muitos frames (>50), tentar reduzir frames para economizar espaço
+        if (info.totalFrames > 50) {
+          frameSkip = Math.ceil(info.totalFrames / 30); // Reduzir para no máximo 30 frames
+        }
+        
+        const frameFiles = [];
+        let frameCount = 0;
+        
+        for (let i = 1; i <= info.totalFrames; i += frameSkip) {
+          const framePath = path.join(frameDir, `frame_${i}.webp`);
+          await execFileAsync('webpmux', ['-get', 'frame', i.toString(), inputPath, '-o', framePath]);
+          
+          // Redimensionar com qualidade agressiva
+          const resizedPath = path.join(frameDir, `resized_${frameCount}.webp`);
+          await execFileAsync('cwebp', [
+            '-q', quality.toString(),
+            '-m', '6', // Máximo esforço de compressão
+            '-resize', '512', '512',
+            framePath,
+            '-o', resizedPath
+          ]);
+          
+          frameFiles.push(resizedPath);
+          frameCount++;
+        }
+        
+        // Ajustar duração baseado nos frames que sobrou
+        const adjustedDuration = Math.max(80, Math.floor((info.duration * frameSkip) / frameCount));
+        const webpmuxArgs = [];
+        
+        frameFiles.forEach((framePath) => {
+          webpmuxArgs.push('-frame', framePath, `+${adjustedDuration}`);
+        });
+        
+        webpmuxArgs.push('-loop', '0', '-o', outputPath);
+        
+        await execFileAsync('webpmux', webpmuxArgs);
+        
+        // Verificar se ainda está muito grande
+        const outputStats = await fs.stat(outputPath);
+        if (outputStats.size > targetSize && frameSkip === 1 && quality > 20) {
+          // Tentar uma vez mais com qualidade ainda menor
+          warn(`Ainda muito grande (${outputStats.size}), tentando qualidade ${quality - 10}`, {
+            targetSize
+          });
+          await this.resizeAnimatedWebPAggressive(inputPath, outputPath, quality - 10, targetSize);
+        }
+        
+      } finally {
+        await fs.remove(frameDir);
+      }
+      
+    } catch (err) {
+      error('Erro na compressão agressiva de WebP animado', err);
+      // Fallback final: processar como estático com qualidade baixa
+      await execFileAsync('cwebp', [
+        '-q', '25',
         '-resize', '512', '512',
         inputPath,
         '-o', outputPath

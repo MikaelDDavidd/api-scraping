@@ -13,18 +13,25 @@ const config = {
     delayBetweenRequests: parseInt(process.env.DELAY_BETWEEN_REQUESTS) || 2000,
     maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
     
-    // Configurações de paginação
-    maxPagesPerRun: parseInt(process.env.MAX_PAGES_PER_RUN) || 5, // Reduzido para testes
-    maxEmptyPagesConsecutive: parseInt(process.env.MAX_EMPTY_PAGES_CONSECUTIVE) || 5,
-    recommendedPacksPaginationEnabled: process.env.RECOMMENDED_PAGINATION_ENABLED !== 'false',
+    // Configurações de paginação (baseado na API original)
+    maxPagesPerKeyword: parseInt(process.env.MAX_PAGES_PER_KEYWORD) || 460, // Como na API original
+    maxPacksPerKeyword: parseInt(process.env.MAX_PACKS_PER_KEYWORD) || 62,   // Como na API original
+    maxEmptyPagesConsecutive: parseInt(process.env.MAX_EMPTY_PAGES_CONSECUTIVE) || 3,
+    
+    // Estratégia: recommend SEM paginação + search COM paginação
+    useRecommendedPacks: process.env.USE_RECOMMENDED_PACKS !== 'false',
+    useKeywordSearch: process.env.USE_KEYWORD_SEARCH !== 'false',
     
     // Locales baseados no código original
     locales: [
       { locale: 'pt-BR', lang: 'pt' }
     ],
     
-    // User-Agent para requests
-    userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; {locale};)',
+    // User-Agent para requests (exato como API original)
+    userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; br;)',
+    
+    // Keywords para busca (como na API original)
+    keywords: ['memes', 'funny', 'love', 'sad', 'happy', 'angry', 'work', 'brasil', 'futebol', 'carnaval'],
     
     // URLs da API do sticker.ly
     apiUrls: {

@@ -14,10 +14,11 @@ class StickerlyClient {
   }
 
   /**
-   * Cria o User-Agent baseado no locale
+   * Retorna o User-Agent fixo (como na API original)
    */
   getUserAgent(locale = 'pt-BR') {
-    return config.scraping.userAgent.replace('{locale}', locale);
+    // API original sempre usa 'br' independente do locale
+    return config.scraping.userAgent;
   }
 
   /**
@@ -138,17 +139,24 @@ class StickerlyClient {
   }
 
   /**
-   * Busca todos os packs de uma keyword com paginação
+   * Busca todos os packs de uma keyword com paginação (como na API original)
    */
-  async searchAllPacks(keyword, locale = 'pt-BR', maxPages = 50) {
-    info(`Iniciando busca completa para keyword: ${keyword}`, { locale, maxPages });
+  async searchAllPacks(keyword, locale = 'pt-BR') {
+    const maxPages = config.scraping.maxPagesPerKeyword;
+    const maxPacks = config.scraping.maxPacksPerKeyword;
+    
+    info(`Iniciando busca completa para keyword: ${keyword}`, { 
+      locale, 
+      maxPages, 
+      maxPacks 
+    });
     
     let allPacks = [];
     let cursor = 0;
     let emptyResponses = 0;
-    const maxEmptyResponses = 3;
+    const maxEmptyResponses = config.scraping.maxEmptyPagesConsecutive;
 
-    while (cursor < maxPages && emptyResponses < maxEmptyResponses) {
+    while (cursor < maxPages && allPacks.length < maxPacks && emptyResponses < maxEmptyResponses) {
       try {
         const packs = await this.searchPacks(keyword, cursor, locale);
         
@@ -168,8 +176,15 @@ class StickerlyClient {
           info(`Página ${cursor}: ${packs.length} packs (${animatedPacks.length} animados)`, {
             keyword,
             cursor,
-            locale
+            locale,
+            totalSoFar: allPacks.length
           });
+          
+          // Limite por keyword como na API original
+          if (allPacks.length >= maxPacks) {
+            info(`Limite de ${maxPacks} packs atingido para keyword: ${keyword}`);
+            break;
+          }
         }
         
         cursor++;
@@ -178,84 +193,46 @@ class StickerlyClient {
       } catch (err) {
         error(`Erro na página ${cursor}`, err, { keyword, locale });
         emptyResponses++;
+        cursor++;
       }
+    }
+
+    // Truncar para limite da API original
+    if (allPacks.length > maxPacks) {
+      allPacks = allPacks.slice(0, maxPacks);
     }
 
     info(`Busca completa finalizada para keyword: ${keyword}`, {
       keyword,
       locale,
       totalPacks: allPacks.length,
-      pagesScraped: cursor
+      pagesScraped: cursor,
+      limitReached: allPacks.length >= maxPacks
     });
 
     return allPacks;
   }
 
   /**
-   * Busca todos os packs recomendados com paginação
+   * Busca packs recomendados (SEM paginação como na API original)
    */
-  async getRecommendedPacksWithPagination(locale = 'pt-BR', maxPages = null) {
-    if (!config.scraping.recommendedPacksPaginationEnabled) {
-      info('Paginação de packs recomendados desabilitada, usando método simples');
-      return await this.getRecommendedPacks(locale, 0);
-    }
-
-    const actualMaxPages = maxPages || config.scraping.maxPagesPerRun;
-    info(`Iniciando busca paginada de packs recomendados`, { 
-      locale, 
-      maxPages: actualMaxPages 
-    });
+  async getRecommendedPacksSingle(locale = 'pt-BR') {
+    info(`Buscando packs recomendados (chamada única como API original)`, { locale });
     
-    let allPacks = [];
-    let cursor = 0;
-    let emptyResponses = 0;
-    const maxEmptyResponses = config.scraping.maxEmptyPagesConsecutive;
-
-    while (cursor < actualMaxPages && emptyResponses < maxEmptyResponses) {
-      try {
-        const packs = await this.getRecommendedPacks(locale, cursor);
-        
-        if (packs.length === 0) {
-          emptyResponses++;
-          info(`Página vazia encontrada (${emptyResponses}/${maxEmptyResponses})`, { 
-            locale, 
-            cursor 
-          });
-          
-          // Se é a primeira página e está vazia, algo está errado
-          if (cursor === 0) {
-            warn('Primeira página de recomendados está vazia', { locale });
-            break;
-          }
-        } else {
-          emptyResponses = 0; // Reset contador se encontrou packs
-          allPacks = allPacks.concat(packs);
-          
-          info(`Página ${cursor}: ${packs.length} packs recomendados`, {
-            locale,
-            cursor,
-            totalSoFar: allPacks.length
-          });
-        }
-        
-        cursor++;
-        await this.delay();
-        
-      } catch (err) {
-        error(`Erro na página ${cursor} de recomendados`, err, { locale });
-        emptyResponses++;
-        cursor++;
-      }
+    try {
+      // API original faz apenas UMA chamada ao endpoint recommend
+      const packs = await this.getRecommendedPacks(locale, 0);
+      
+      info(`Packs recomendados obtidos`, {
+        locale,
+        totalPacks: packs.length
+      });
+      
+      return packs;
+    } catch (err) {
+      error('Erro ao buscar packs recomendados', err, { locale });
+      return [];
     }
-
-    info(`Busca paginada de recomendados finalizada`, {
-      locale,
-      totalPacks: allPacks.length,
-      pagesScraped: cursor,
-      stoppedReason: cursor >= actualMaxPages ? 'max_pages_reached' : 'empty_pages_limit'
-    });
-
-    return allPacks;
   }
 
   /**
