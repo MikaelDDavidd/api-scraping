@@ -204,12 +204,8 @@ class SupabaseClient {
     try {
       info(`Iniciando upload do pack: ${packId}`);
 
-      // 1. Verificar se pack já existe
-      const existingPackId = await this.packExists(packData.identifier);
-      if (existingPackId) {
-        warn(`Pack já existe no banco`, { identifier: packData.identifier });
-        return existingPackId;
-      }
+      // ✅ Pack já foi verificado no batch - pular verificação individual
+      // Comentário: verificação redundante removida para melhorar performance
 
       // 2. Upload da tray (DEVE ser PNG para WhatsApp) - DIRETO NA RAIZ
       let trayPath = null;

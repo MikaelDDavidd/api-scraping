@@ -24,23 +24,42 @@ class FastDuplicateChecker {
     info('Carregando cache completo de pack IDs existentes...');
 
     try {
-      // Buscar APENAS os IDs (query mínima e rápida)
-      const { data: packs, error: fetchError } = await this.supabase
-        .from('packs')
-        .select('identifier') // Apenas o campo ID
-        .order('created_at', { ascending: false });
+      // 🚀 PAGINAÇÃO para buscar TODOS os packs (contornar limite de 1000)
+      let allPacks = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (fetchError) {
-        throw fetchError;
+      while (hasMore) {
+        const { data: packs, error: fetchError } = await this.supabase
+          .from('packs')
+          .select('identifier')
+          .order('created_at', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (packs && packs.length > 0) {
+          allPacks.push(...packs);
+          info(`Página ${page + 1}: ${packs.length} packs carregados (total: ${allPacks.length})`);
+          
+          // Se retornou menos que o tamanho da página, não há mais dados
+          hasMore = packs.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
       // Converter para Set para lookup O(1)
-      this.existingPackIds = new Set(packs.map(p => p.identifier));
+      this.existingPackIds = new Set(allPacks.map(p => p.identifier));
       this.cacheLoaded = true;
       this.lastCacheUpdate = Date.now();
 
       const duration = Date.now() - startTime;
-      info(`Cache carregado: ${this.existingPackIds.size} pack IDs em ${duration}ms`);
+      info(`Cache carregado: ${this.existingPackIds.size} pack IDs em ${duration}ms (${page} páginas)`);
       
       return this.existingPackIds.size;
 

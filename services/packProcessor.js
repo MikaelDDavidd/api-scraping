@@ -76,15 +76,8 @@ class PackProcessor {
         return false;
       }
 
-      // Verificar se pack já existe no banco
-      const existingPackId = await this.supabaseClient.packExists(packId);
-      if (existingPackId) {
-        info(`Pack já existe no banco: ${packId}`);
-        this.processedPacks.add(packId);
-        // Track pack como existente
-        this.sessionStats.trackPackFound(packId, pack.name, source, locale, false);
-        return false;
-      }
+      // ✅ Pack já foi verificado no batch - pular verificação individual
+      // Comentário: verificação redundante removida para melhorar performance
 
       // Track pack como novo
       this.sessionStats.trackPackFound(packId, pack.name, source, locale, true);
