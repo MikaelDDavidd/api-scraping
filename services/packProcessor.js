@@ -5,6 +5,7 @@ const { config } = require("../config/config");
 const StickerlyClient = require("./stickerlyClient");
 const ImageProcessor = require("./imageProcessor");
 const SupabaseClient = require("./supabaseClient");
+const FastDuplicateChecker = require("./fastDuplicateChecker");
 const SessionStats = require("../utils/sessionStats");
 const {
   info,
@@ -21,10 +22,11 @@ class PackProcessor {
     this.stickerlyClient = new StickerlyClient();
     this.imageProcessor = new ImageProcessor();
     this.supabaseClient = new SupabaseClient();
+    this.fastDuplicateChecker = new FastDuplicateChecker(); // Verificador rápido de duplicados
     this.sessionStats = new SessionStats(); // Nova instância de estatísticas da sessão
     this.processedPacks = new Set();
     this.failedPacks = new Set();
-    this.existingPackIds = new Set(); // Cache de IDs existentes
+    this.existingPackIds = new Set(); // Cache de IDs existentes (deprecado - usar fastDuplicateChecker)
     this.cacheLoaded = false;
     this.startTime = Date.now(); // Tempo de início para controle de runtime
     this.maxRuntimeMs = config.scraping.maxRuntime * 60 * 60 * 1000; // Converter horas para ms
@@ -376,23 +378,33 @@ class PackProcessor {
   }
 
   /**
-   * Carrega todos os IDs de packs existentes no banco para cache
+   * Carrega todos os IDs de packs existentes no banco para cache ULTRA-RÁPIDO
    */
   async loadExistingPackIds() {
     if (this.cacheLoaded) return;
     
     try {
-      info('Carregando cache de IDs existentes...');
-      const existingIds = await this.supabaseClient.getAllPackIds();
-      this.existingPackIds = new Set(existingIds);
+      // Usar verificador rápido ao invés do método lento
+      const cacheSize = await this.fastDuplicateChecker.loadExistingPacksCache();
       this.cacheLoaded = true;
-      info(`Cache carregado: ${this.existingPackIds.size} packs existentes`, {
-        sampleIds: existingIds.slice(0, 5) // Mostrar primeiros 5 IDs como exemplo
-      });
+      
+      // Manter compatibilidade com código legado
+      this.existingPackIds = this.fastDuplicateChecker.existingPackIds;
+      
+      info(`Cache ULTRA-RÁPIDO carregado: ${cacheSize} packs existentes`);
     } catch (err) {
-      error('Erro ao carregar cache de IDs', err);
-      // Fallback para verificação individual
-      this.cacheLoaded = false;
+      error('Erro ao carregar cache rápido de IDs', err);
+      // Fallback para método antigo
+      try {
+        info('Tentativa de fallback para método antigo...');
+        const existingIds = await this.supabaseClient.getAllPackIds();
+        this.existingPackIds = new Set(existingIds);
+        this.cacheLoaded = true;
+        info(`Cache fallback carregado: ${this.existingPackIds.size} packs`);
+      } catch (fallbackErr) {
+        error('Erro também no fallback', fallbackErr);
+        this.cacheLoaded = false;
+      }
     }
   }
 
@@ -443,9 +455,39 @@ class PackProcessor {
         targetNewPacks
       });
 
-      // Processar todos os packs recomendados
-      for (let i = 0; i < validPacks.length && successfulPacks < targetNewPacks; i++) {
-        const pack = validPacks[i];
+      // 🚀 VERIFICAÇÃO ULTRA-RÁPIDA EM BATCH - Separar novos dos existentes
+      info('🚀 Fazendo verificação ultra-rápida de duplicados...');
+      const batchResult = await this.fastDuplicateChecker.batchCheckDuplicates(validPacks);
+      
+      info(`Verificação batch concluída:`, {
+        totalChecked: validPacks.length,
+        newPacks: batchResult.newPacks.length,
+        existingPacks: batchResult.existingPacks.length,
+        duplicateRate: `${((batchResult.existingPacks.length / validPacks.length) * 100).toFixed(1)}%`
+      });
+
+      // Processar apenas os packs NOVOS (economia massiva de tempo)
+      const packsToProcess = batchResult.newPacks.slice(0, targetNewPacks);
+      skippedExisting = batchResult.existingPacks.length;
+
+      if (packsToProcess.length === 0) {
+        info('🎯 Todos os packs recomendados já existem no banco', { 
+          locale, 
+          totalExisting: batchResult.existingPacks.length 
+        });
+        return { 
+          total: validPacks.length, 
+          successful: 0, 
+          failed: 0, 
+          existing: batchResult.existingPacks.length 
+        };
+      }
+
+      info(`Processando apenas ${packsToProcess.length} packs NOVOS (pulando ${skippedExisting} existentes)`);
+
+      // Processar todos os packs NOVOS
+      for (let i = 0; i < packsToProcess.length; i++) {
+        const pack = packsToProcess[i];
 
         try {
           // Verificar timeout antes de processar cada pack
@@ -454,23 +496,18 @@ class PackProcessor {
             info('🛑 Timeout atingido durante processamento de packs recomendados', {
               locale,
               processedSoFar: successfulPacks,
-              remaining: validPacks.length - i
+              remaining: packsToProcess.length - i
             });
             break;
           }
 
-          // Verificar se já foi processado nesta sessão
+          // Verificar se já foi processado nesta sessão (check rápido em memória)
           if (this.processedPacks.has(pack.packId)) {
             skippedExisting++;
             continue;
           }
 
-          // Verificar se já existe no banco
-          const existingPackId = await this.packExistsOptimized(pack.packId);
-          if (existingPackId) {
-            skippedExisting++;
-            continue;
-          }
+          // ✅ Pack já foi verificado no batch - não precisa verificar novamente no banco
 
           // Pack novo encontrado
           info(`Pack NOVO recomendado: ${pack.packId}`, {
@@ -572,14 +609,37 @@ class PackProcessor {
           continue;
         }
 
+        // 🚀 VERIFICAÇÃO ULTRA-RÁPIDA EM BATCH para keyword
+        const keywordBatchResult = await this.fastDuplicateChecker.batchCheckDuplicates(validPacks);
+        
+        info(`Keyword '${keyword}' - verificação batch:`, {
+          totalChecked: validPacks.length,
+          newPacks: keywordBatchResult.newPacks.length,
+          existingPacks: keywordBatchResult.existingPacks.length,
+          duplicateRate: `${((keywordBatchResult.existingPacks.length / validPacks.length) * 100).toFixed(1)}%`
+        });
+
         let keywordProcessed = 0;
         let keywordSuccessful = 0;
-        let keywordSkipped = 0;
+        let keywordSkipped = keywordBatchResult.existingPacks.length; // Packs já pulados no batch
         const maxPacksPerKeyword = config.scraping.maxPacksPerKeyword;
 
-        // Processar packs desta keyword
-        for (let i = 0; i < Math.min(validPacks.length, maxPacksPerKeyword); i++) {
-          const pack = validPacks[i];
+        // Processar apenas os packs NOVOS desta keyword
+        const packsToProcess = keywordBatchResult.newPacks.slice(0, maxPacksPerKeyword);
+        
+        if (packsToProcess.length === 0) {
+          info(`🎯 Todos os packs da keyword '${keyword}' já existem no banco`, { 
+            locale, 
+            totalExisting: keywordBatchResult.existingPacks.length 
+          });
+          totalSkipped += keywordSkipped;
+          continue;
+        }
+
+        info(`Processando apenas ${packsToProcess.length} packs NOVOS da keyword '${keyword}' (pulando ${keywordBatchResult.existingPacks.length} existentes)`);
+
+        for (let i = 0; i < packsToProcess.length; i++) {
+          const pack = packsToProcess[i];
 
           try {
             // Verificar timeout antes de processar cada pack
@@ -589,23 +649,18 @@ class PackProcessor {
                 keyword,
                 locale,
                 processedSoFar: keywordSuccessful,
-                remaining: Math.min(validPacks.length, maxPacksPerKeyword) - i
+                remaining: packsToProcess.length - i
               });
               break;
             }
 
-            // Verificar se já foi processado
+            // Verificar se já foi processado nesta sessão
             if (this.processedPacks.has(pack.packId)) {
               keywordSkipped++;
               continue;
             }
 
-            // Verificar se já existe no banco
-            const existingPackId = await this.packExistsOptimized(pack.packId);
-            if (existingPackId) {
-              keywordSkipped++;
-              continue;
-            }
+            // ✅ Pack já foi verificado no batch - não precisa verificar novamente no banco
 
             // Processar pack novo
             const success = await this.processPack(pack, locale, "keyword");
