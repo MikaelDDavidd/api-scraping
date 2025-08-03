@@ -2,6 +2,7 @@
 
 const { config, validateConfig } = require('./config/config');
 const PackProcessor = require('./services/packProcessor');
+const OptimizedPackProcessor = require('./services/optimizedPackProcessor');
 const { info, error, warn } = require('./utils/logger');
 
 // Validar configurações no início
@@ -59,7 +60,14 @@ async function main() {
     info('🚀 Iniciando Stickers Scraper');
     info(`Configuração: ${config.scraping.locales.length} locales, max ${config.scraping.maxPacksPerRun} packs por execução`);
 
-    const processor = new PackProcessor();
+    // Selecionar processor baseado no modo
+    const mode = process.argv[2];
+    const useOptimized = mode && (mode.includes('optimized') || mode.includes('turbo'));
+    const processor = useOptimized ? new OptimizedPackProcessor() : new PackProcessor();
+    
+    if (useOptimized) {
+      info('🚀 Modo OTIMIZADO ativado - usando descobertas da API');
+    }
 
     // Keywords padrão baseadas no código original
     const defaultKeywords = [
@@ -146,6 +154,23 @@ async function main() {
         await processor.startContinuousScraping(keywordsForContinuous);
         return; // Nunca chegará aqui
 
+      case 'optimized':
+      case 'turbo':
+        // 🚀 NOVO: Modo otimizado com descobertas da API
+        const optimizedKeywords = args.slice(1);
+        const keywordsForOptimized = optimizedKeywords.length > 0 ? optimizedKeywords : defaultKeywords;
+        
+        info(`🚀 Modo: Scraping OTIMIZADO`);
+        info(`   - Usa endpoint leve (v1) quando possível`);
+        info(`   - Filtros de categoria inteligentes`);
+        info(`   - Cache avançado de duplicados`);
+        info(`   - Estratégia adaptativa discovery vs. efficiency`);
+        info(`Keywords: ${keywordsForOptimized.join(', ')}`);
+        
+        const optimizedResult = await processor.runFullOptimizedScraping(keywordsForOptimized);
+        info('Resultado otimizado:', optimizedResult);
+        break;
+
       case 'stats':
         // Mostrar estatísticas da sessão
         processor.printApuracao(); // Log simples primeiro
@@ -190,6 +215,8 @@ Comandos disponíveis:
   recommended           Processa apenas packs recomendados
   keywords [palavras]   Processa apenas por busca de keywords
   full [palavras]       Processamento completo (recomendados + keywords)
+  optimized [palavras]  🚀 Scraping OTIMIZADO (usa descobertas da API)
+  turbo [palavras]      🚀 Alias para 'optimized'
   continuous [palavras] ⭐ Scraping contínuo (como API original) - roda infinitamente
   test                  Modo de teste (1 pack por locale)
   stats                 Mostra estatísticas da sessão atual
@@ -200,9 +227,18 @@ Exemplos:
   node index.js recommended               # Apenas packs recomendados
   node index.js keywords memes funny      # Busca por "memes" e "funny"
   node index.js full amor trabalho        # Completo com keywords customizadas
-  node index.js continuous                # ⭐ Scraping contínuo (recomendado para produção)
+  node index.js optimized                 # 🚀 Scraping otimizado (RECOMENDADO)
+  node index.js turbo memes love          # 🚀 Scraping otimizado com keywords específicas
+  node index.js continuous                # ⭐ Scraping contínuo (para produção)
   node index.js continuous memes love     # Scraping contínuo com keywords específicas
   node index.js test                      # Teste rápido
+
+🚀 MODO OTIMIZADO (Novidade):
+  - Usa endpoint leve (v1) quando possível (~53KB vs ~780KB)
+  - Aplica filtros de categoria descobertos na investigação da API
+  - Cache inteligente para pular duplicados mais rapidamente
+  - Estratégia adaptativa: discovery mode vs. efficiency mode
+  - Taxa de sucesso muito maior em encontrar packs novos
 
 Configuração:
   Edite o arquivo .env para configurar Supabase e outros parâmetros.
