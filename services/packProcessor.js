@@ -5,6 +5,7 @@ const { config } = require("../config/config");
 const StickerlyClient = require("./stickerlyClient");
 const ImageProcessor = require("./imageProcessor");
 const SupabaseClient = require("./supabaseClient");
+const SessionStats = require("../utils/sessionStats");
 const {
   info,
   error,
@@ -20,17 +21,40 @@ class PackProcessor {
     this.stickerlyClient = new StickerlyClient();
     this.imageProcessor = new ImageProcessor();
     this.supabaseClient = new SupabaseClient();
+    this.sessionStats = new SessionStats(); // Nova instância de estatísticas da sessão
     this.processedPacks = new Set();
     this.failedPacks = new Set();
     this.existingPackIds = new Set(); // Cache de IDs existentes
     this.cacheLoaded = false;
+    this.startTime = Date.now(); // Tempo de início para controle de runtime
+    this.maxRuntimeMs = config.scraping.maxRuntime * 60 * 60 * 1000; // Converter horas para ms
+  }
+
+  /**
+   * Verifica se o limite de tempo de execução foi atingido
+   */
+  isTimeoutReached() {
+    const elapsedMs = Date.now() - this.startTime;
+    const remainingMs = this.maxRuntimeMs - elapsedMs;
+    const isTimeout = elapsedMs >= this.maxRuntimeMs;
+    
+    if (isTimeout) {
+      info('⏰ Limite de tempo atingido', {
+        maxRuntime: `${config.scraping.maxRuntime}h`,
+        elapsedTime: `${Math.round(elapsedMs / 1000 / 60)}min`,
+        reason: 'Graceful shutdown iniciado'
+      });
+    }
+    
+    return { isTimeout, remainingMs, elapsedMs };
   }
 
   /**
    * Processa um pack completo do sticker.ly
    */
-  async processPack(pack, locale = "pt-BR") {
+  async processPack(pack, locale = "pt-BR", source = "unknown") {
     const packId = pack.packId;
+    const packStartTime = Date.now();
 
     try {
       packFound(packId, pack.name);
@@ -55,8 +79,13 @@ class PackProcessor {
       if (existingPackId) {
         info(`Pack já existe no banco: ${packId}`);
         this.processedPacks.add(packId);
+        // Track pack como existente
+        this.sessionStats.trackPackFound(packId, pack.name, source, locale, false);
         return false;
       }
+
+      // Track pack como novo
+      this.sessionStats.trackPackFound(packId, pack.name, source, locale, true);
 
       // Validar dados do pack
       if (!this.stickerlyClient.validatePack(pack)) {
@@ -143,24 +172,39 @@ class PackProcessor {
         }
         packProcessed(packId, validStickers.length, true);
 
+        // Track processamento bem-sucedido
+        const packProcessingTime = Date.now() - packStartTime;
+        this.sessionStats.trackPackProcessed(packId, true, validStickers.length, packProcessingTime, source, locale);
+
         info(`Upload concluído com sucesso`, {
           packId,
           dbPackId,
           isAnimated: pack.isAnimated,
           validStickers: validStickers.length,
           totalStickers: stickersWithStatus.length,
+          processingTime: `${packProcessingTime}ms`
         });
 
         return true;
       } else {
         this.failedPacks.add(packId);
         packProcessed(packId, validStickers.length, false);
+        
+        // Track processamento com erro
+        const packProcessingTime = Date.now() - packStartTime;
+        this.sessionStats.trackPackProcessed(packId, false, validStickers.length, packProcessingTime, source, locale);
+        
         return false;
       }
     } catch (err) {
       error(`Erro ao processar pack: ${packId}`, err);
       this.failedPacks.add(packId);
       packProcessed(packId, 0, false);
+      
+      // Track erro de processamento
+      const packProcessingTime = Date.now() - packStartTime;
+      this.sessionStats.trackPackProcessed(packId, false, 0, packProcessingTime, source, locale);
+      
       return false;
     } finally {
       // Limpar arquivos temporários
@@ -209,6 +253,7 @@ class PackProcessor {
         if (!isValid) {
           warn(`Imagem corrompida: ${stickers[item]}`, { packId });
           status = false;
+          this.sessionStats.trackStickerProcessed(false);
         } else {
           // EXATO: validação de frames (linhas 186-191)
           const stickerInfo = await this.imageProcessor.getWebPInfo(buffer);
@@ -218,6 +263,9 @@ class PackProcessor {
               stickerInfo: stickerInfo,
             });
             status = false;
+            this.sessionStats.trackStickerProcessed(false);
+          } else {
+            this.sessionStats.trackStickerProcessed(true);
           }
         }
 
@@ -246,6 +294,7 @@ class PackProcessor {
             name: stickerName,
             processedSticker: null,
           });
+          this.sessionStats.trackStickerProcessed(false);
         }
 
         // Delay entre downloads
@@ -259,6 +308,7 @@ class PackProcessor {
           name: stickerName,
           processedSticker: null,
         });
+        this.sessionStats.trackStickerProcessed(false);
         continue;
       }
     }
@@ -398,6 +448,17 @@ class PackProcessor {
         const pack = validPacks[i];
 
         try {
+          // Verificar timeout antes de processar cada pack
+          const timeStatus = this.isTimeoutReached();
+          if (timeStatus.isTimeout) {
+            info('🛑 Timeout atingido durante processamento de packs recomendados', {
+              locale,
+              processedSoFar: successfulPacks,
+              remaining: validPacks.length - i
+            });
+            break;
+          }
+
           // Verificar se já foi processado nesta sessão
           if (this.processedPacks.has(pack.packId)) {
             skippedExisting++;
@@ -419,7 +480,7 @@ class PackProcessor {
           });
 
           // Processar pack
-          const success = await this.processPack(pack, locale);
+          const success = await this.processPack(pack, locale, "recommended");
           processedPacks++;
           
           if (success) {
@@ -489,6 +550,17 @@ class PackProcessor {
 
     for (const keyword of keywordsToUse) {
       try {
+        // Verificar timeout antes de processar cada keyword
+        const timeStatus = this.isTimeoutReached();
+        if (timeStatus.isTimeout) {
+          info('🛑 Timeout atingido durante loop de keywords', {
+            locale,
+            totalKeywords: keywordsToUse.length,
+            currentKeyword: keyword
+          });
+          break;
+        }
+
         info(`Processando keyword: ${keyword}`, { locale });
 
         // Buscar todos os packs para esta keyword (com paginação)
@@ -510,6 +582,18 @@ class PackProcessor {
           const pack = validPacks[i];
 
           try {
+            // Verificar timeout antes de processar cada pack
+            const timeStatus = this.isTimeoutReached();
+            if (timeStatus.isTimeout) {
+              info('🛑 Timeout atingido durante processamento de keywords', {
+                keyword,
+                locale,
+                processedSoFar: keywordSuccessful,
+                remaining: Math.min(validPacks.length, maxPacksPerKeyword) - i
+              });
+              break;
+            }
+
             // Verificar se já foi processado
             if (this.processedPacks.has(pack.packId)) {
               keywordSkipped++;
@@ -524,7 +608,7 @@ class PackProcessor {
             }
 
             // Processar pack novo
-            const success = await this.processPack(pack, locale);
+            const success = await this.processPack(pack, locale, "keyword");
             keywordProcessed++;
             
             if (success) {
@@ -546,6 +630,9 @@ class PackProcessor {
         totalProcessed += keywordProcessed;
         totalSuccessful += keywordSuccessful;
         totalSkipped += keywordSkipped;
+
+        // Track keyword processada
+        this.sessionStats.trackKeywordProcessed(keyword, locale, validPacks.length);
 
         info(`Keyword processada: ${keyword}`, {
           locale,
@@ -599,6 +686,15 @@ class PackProcessor {
         const locale = localeConfig.locale;
         
         try {
+          // Verificar timeout antes de processar cada locale
+          const timeStatus = this.isTimeoutReached();
+          if (timeStatus.isTimeout) {
+            info('🛑 Timeout atingido durante loop de locales', {
+              currentLocale: locale,
+              totalLocales: config.scraping.locales.length
+            });
+            break;
+          }
           // 1. Packs recomendados (sem paginação)
           if (config.scraping.useRecommendedPacks) {
             const recommendedResult = await this.processRecommendedPacks(locale);
@@ -702,14 +798,21 @@ class PackProcessor {
    * Retorna estatísticas da sessão atual
    */
   getSessionStats() {
-    return {
-      processedPacks: this.processedPacks.size,
-      failedPacks: this.failedPacks.size,
-      successRate:
-        (this.processedPacks.size /
-          (this.processedPacks.size + this.failedPacks.size)) *
-        100,
-    };
+    return this.sessionStats.getSessionSummary();
+  }
+
+  /**
+   * Retorna relatório completo da sessão e salva no log
+   */
+  getSessionReport() {
+    return this.sessionStats.logSessionEnd();
+  }
+
+  /**
+   * Imprime relatório final formatado
+   */
+  printSessionSummary() {
+    return this.sessionStats.printSummary();
   }
 
   /**

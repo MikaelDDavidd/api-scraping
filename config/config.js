@@ -12,6 +12,7 @@ const config = {
     maxPacksPerRun: parseInt(process.env.MAX_PACKS_PER_RUN) || 50,
     delayBetweenRequests: parseInt(process.env.DELAY_BETWEEN_REQUESTS) || 2000,
     maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
+    maxRuntime: parseInt(process.env.MAX_RUNTIME_HOURS) || 5, // Limite de 5 horas
     
     // Configurações de paginação (baseado na API original)
     maxPagesPerKeyword: parseInt(process.env.MAX_PAGES_PER_KEYWORD) || 460, // Como na API original

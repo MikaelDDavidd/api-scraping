@@ -148,8 +148,7 @@ async function main() {
 
       case 'stats':
         // Mostrar estatísticas da sessão
-        const stats = processor.getSessionStats();
-        info('Estatísticas da sessão:', stats);
+        processor.printSessionSummary();
         return;
 
       case 'help':
@@ -166,11 +165,9 @@ async function main() {
         break;
     }
 
-    // Mostrar estatísticas finais
-    const finalStats = processor.getSessionStats();
-    info('📊 Estatísticas finais da sessão:', finalStats);
-
+    // Mostrar relatório final da sessão
     info('✅ Scraping finalizado com sucesso');
+    processor.printSessionSummary();
 
   } catch (err) {
     error('❌ Erro fatal no scraper', err);
