@@ -148,7 +148,8 @@ async function main() {
 
       case 'stats':
         // Mostrar estatísticas da sessão
-        processor.printSessionSummary();
+        processor.printApuracao(); // Log simples primeiro
+        processor.printSessionSummary(); // Log detalhado depois
         return;
 
       case 'help':
@@ -167,7 +168,8 @@ async function main() {
 
     // Mostrar relatório final da sessão
     info('✅ Scraping finalizado com sucesso');
-    processor.printSessionSummary();
+    processor.printApuracao(); // Log simples primeiro
+    processor.printSessionSummary(); // Log detalhado depois
 
   } catch (err) {
     error('❌ Erro fatal no scraper', err);

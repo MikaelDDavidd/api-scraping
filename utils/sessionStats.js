@@ -304,6 +304,23 @@ class SessionStats {
     return summary;
   }
   
+  // Log de apuração simples - apenas contagens principais
+  printApuracao() {
+    const summary = this.getSessionSummary();
+    
+    console.log('\n' + '='.repeat(40));
+    console.log('📊 APURAÇÃO GERAL');
+    console.log('='.repeat(40));
+    console.log(`Packs encontrados: ${summary.packsSummary.totalFound}`);
+    console.log(`Packs novos: ${summary.packsSummary.newPacks}`);
+    console.log(`Packs repetidos: ${summary.packsSummary.existingPacks}`);
+    console.log(`Packs processados: ${summary.packsSummary.processedSuccessfully}`);
+    console.log(`Packs com erro: ${summary.packsSummary.processedWithError}`);
+    console.log(`Taxa de sucesso: ${summary.packsSummary.successRate}%`);
+    console.log(`Duração: ${summary.sessionInfo.durationMinutes} min`);
+    console.log('='.repeat(40));
+  }
+
   printSummary() {
     const summary = this.getSessionSummary();
     

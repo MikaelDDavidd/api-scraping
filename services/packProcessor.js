@@ -809,6 +809,13 @@ class PackProcessor {
   }
 
   /**
+   * Imprime apuração simples
+   */
+  printApuracao() {
+    return this.sessionStats.printApuracao();
+  }
+
+  /**
    * Imprime relatório final formatado
    */
   printSessionSummary() {

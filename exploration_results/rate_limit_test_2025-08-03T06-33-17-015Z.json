@@ -1,0 +1,744 @@
+{
+  "timestamp": "2025-08-03T06:33:17.015Z",
+  "rateLimitTest": {
+    "totalRequests": 20,
+    "successful": 20,
+    "rateLimited": 0,
+    "results": [
+      {
+        "requestNumber": 1,
+        "success": true,
+        "status": 200,
+        "responseTime": 2191,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:32 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"04da066fa4bd8476f5908bcbcbe29678f\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:33.279Z"
+      },
+      {
+        "requestNumber": 2,
+        "success": true,
+        "status": 200,
+        "responseTime": 2479,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:34 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0e414a81ff9a7d84e11077d1ae525574f\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:35.869Z"
+      },
+      {
+        "requestNumber": 3,
+        "success": true,
+        "status": 200,
+        "responseTime": 2157,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:36 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0545eaa4c096accca5e7e28e68e38fd59\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:38.131Z"
+      },
+      {
+        "requestNumber": 4,
+        "success": true,
+        "status": 200,
+        "responseTime": 2998,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:40 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0941d48877c23f8da9dd02fb6f2a1bd11\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:41.231Z"
+      },
+      {
+        "requestNumber": 5,
+        "success": true,
+        "status": 200,
+        "responseTime": 2037,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:42 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"03f25cd4ef62d64df02a5956aff245683\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:43.374Z"
+      },
+      {
+        "requestNumber": 6,
+        "success": true,
+        "status": 200,
+        "responseTime": 2083,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:44 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"03f25cd4ef62d64df02a5956aff245683\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:45.563Z"
+      },
+      {
+        "requestNumber": 7,
+        "success": true,
+        "status": 200,
+        "responseTime": 2033,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:46 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"03f25cd4ef62d64df02a5956aff245683\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:47.701Z"
+      },
+      {
+        "requestNumber": 8,
+        "success": true,
+        "status": 200,
+        "responseTime": 2066,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:48 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0d542d1bd76ac77998e038eaf3193172e\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:49.871Z"
+      },
+      {
+        "requestNumber": 9,
+        "success": true,
+        "status": 200,
+        "responseTime": 2047,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:50 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"09a0f87c089cd21dfc3ba9e79f9d6913a\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:52.024Z"
+      },
+      {
+        "requestNumber": 10,
+        "success": true,
+        "status": 200,
+        "responseTime": 1933,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:52 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0a6ecefda68c3b007d6f01254e7dcdbca\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:54.061Z"
+      },
+      {
+        "requestNumber": 11,
+        "success": true,
+        "status": 200,
+        "responseTime": 2199,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:55 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"09a0f87c089cd21dfc3ba9e79f9d6913a\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:56.365Z"
+      },
+      {
+        "requestNumber": 12,
+        "success": true,
+        "status": 200,
+        "responseTime": 2063,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:57 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"09a0f87c089cd21dfc3ba9e79f9d6913a\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:31:58.534Z"
+      },
+      {
+        "requestNumber": 13,
+        "success": true,
+        "status": 200,
+        "responseTime": 2078,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:31:59 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0d542d1bd76ac77998e038eaf3193172e\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:00.717Z"
+      },
+      {
+        "requestNumber": 14,
+        "success": true,
+        "status": 200,
+        "responseTime": 3069,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:02 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0d34cedecc1fa77c33760d32f06d5bfcb\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:03.891Z"
+      },
+      {
+        "requestNumber": 15,
+        "success": true,
+        "status": 200,
+        "responseTime": 2187,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:05 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0a242cb333f312cbbaab122b64327c9a3\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:06.182Z"
+      },
+      {
+        "requestNumber": 16,
+        "success": true,
+        "status": 200,
+        "responseTime": 1955,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:07 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"035e1d3fa9feca56502cf347504df1850\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:08.243Z"
+      },
+      {
+        "requestNumber": 17,
+        "success": true,
+        "status": 200,
+        "responseTime": 1863,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:09 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0d583e5f41d9d5a6ad407a43ac78c0e63\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:10.210Z"
+      },
+      {
+        "requestNumber": 18,
+        "success": true,
+        "status": 200,
+        "responseTime": 1877,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:11 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"035e1d3fa9feca56502cf347504df1850\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:12.193Z"
+      },
+      {
+        "requestNumber": 19,
+        "success": true,
+        "status": 200,
+        "responseTime": 1990,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:13 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"0d583e5f41d9d5a6ad407a43ac78c0e63\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:14.285Z"
+      },
+      {
+        "requestNumber": 20,
+        "success": true,
+        "status": 200,
+        "responseTime": 2225,
+        "responseSize": 779608,
+        "headers": {
+          "date": "Sun, 03 Aug 2025 06:32:15 GMT",
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+          "vary": "Accept-Encoding, Accept-Encoding",
+          "etag": "W/\"035e1d3fa9feca56502cf347504df1850\"",
+          "referrer-policy": "unsafe-url",
+          "server": "nfront"
+        },
+        "timestamp": "2025-08-03T06:32:16.613Z"
+      }
+    ]
+  },
+  "responseTimeTest": {
+    "results": [
+      {
+        "url": "http://api.sticker.ly/v3.1/stickerPack/recommend?withAnimation=true",
+        "attempts": [
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 2365,
+            "responseSize": 779608,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:18 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0ed751864de98f21b363bb993b1495965\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:19.984Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 2166,
+            "responseSize": 779608,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:21 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0615add3f85d6911ec67572428bec7358\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:23.154Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1927,
+            "responseSize": 779608,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:24 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"08ba3e4c624f5a2ac2b133112320a87aa\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:26.086Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1913,
+            "responseSize": 779608,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:27 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"03ad425585f946285d7297d1508f6317a\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:29.004Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 2612,
+            "responseSize": 779608,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:31 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0659f02e0b5996dee40f27766b8b304e5\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:32.620Z"
+          }
+        ],
+        "stats": {
+          "avgTime": 2196.6,
+          "minTime": 1913,
+          "maxTime": 2612
+        }
+      },
+      {
+        "url": "http://api.sticker.ly/v1/sticker/recommend",
+        "attempts": [
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1059,
+            "responseSize": 53671,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:34 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+              "etag": "W/\"0f1ab518f49a0aaa3e0b24f06b47afbd0\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:34.680Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1051,
+            "responseSize": 53369,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:36 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+              "etag": "W/\"04a784ffe6c390bd970392b0b8b17d71c\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:36.734Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 960,
+            "responseSize": 53671,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:38 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+              "etag": "W/\"0f1ab518f49a0aaa3e0b24f06b47afbd0\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:38.696Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1105,
+            "responseSize": 53081,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:40 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+              "etag": "W/\"00a3e7beba7b0b3e897457be73c12b00c\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:40.803Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 1094,
+            "responseSize": 54330,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:42 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+              "etag": "W/\"0a7d4f03f55a75768b9e09ad6f8dae731\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:42.898Z"
+          }
+        ],
+        "stats": {
+          "avgTime": 1053.8,
+          "minTime": 960,
+          "maxTime": 1105
+        }
+      },
+      {
+        "url": "http://api.sticker.ly/health",
+        "attempts": [
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 531,
+            "responseSize": 27,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:44 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0c878f1a5d1ae7d18e2c5994dfc152de7\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:44.431Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 536,
+            "responseSize": 27,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:45 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0c878f1a5d1ae7d18e2c5994dfc152de7\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:45.969Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 513,
+            "responseSize": 27,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:47 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0c878f1a5d1ae7d18e2c5994dfc152de7\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:47.489Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 551,
+            "responseSize": 27,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:49 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0c878f1a5d1ae7d18e2c5994dfc152de7\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:49.041Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 520,
+            "responseSize": 27,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:50 GMT",
+              "content-type": "application/json",
+              "transfer-encoding": "chunked",
+              "vary": "Accept-Encoding, Accept-Encoding",
+              "etag": "W/\"0c878f1a5d1ae7d18e2c5994dfc152de7\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:50.562Z"
+          }
+        ],
+        "stats": {
+          "avgTime": 530.2,
+          "minTime": 513,
+          "maxTime": 551
+        }
+      },
+      {
+        "url": "http://api.sticker.ly/status",
+        "attempts": [
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 478,
+            "responseSize": 43,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:52 GMT",
+              "content-length": "43",
+              "etag": "\"0d41d8cd98f00b204e9800998ecf8427e\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:52.041Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 534,
+            "responseSize": 43,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:53 GMT",
+              "content-length": "43",
+              "etag": "\"0d41d8cd98f00b204e9800998ecf8427e\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:53.576Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 602,
+            "responseSize": 43,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:55 GMT",
+              "content-length": "43",
+              "etag": "\"0d41d8cd98f00b204e9800998ecf8427e\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:55.180Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 496,
+            "responseSize": 43,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:56 GMT",
+              "content-length": "43",
+              "etag": "\"0d41d8cd98f00b204e9800998ecf8427e\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:56.677Z"
+          },
+          {
+            "success": true,
+            "status": 200,
+            "responseTime": 678,
+            "responseSize": 43,
+            "headers": {
+              "date": "Sun, 03 Aug 2025 06:32:58 GMT",
+              "content-length": "43",
+              "etag": "\"0d41d8cd98f00b204e9800998ecf8427e\"",
+              "referrer-policy": "unsafe-url",
+              "server": "nfront"
+            },
+            "timestamp": "2025-08-03T06:32:58.357Z"
+          }
+        ],
+        "stats": {
+          "avgTime": 557.6,
+          "minTime": 478,
+          "maxTime": 678
+        }
+      }
+    ]
+  },
+  "deviceIdTest": {
+    "results": [
+      {
+        "deviceId": "20fa5a958492bbd3",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      },
+      {
+        "deviceId": "30fb6b068593cce4",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      },
+      {
+        "deviceId": "40fc7c178694ddf5",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      },
+      {
+        "deviceId": "invalid-device-id",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      },
+      {
+        "deviceId": "",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      },
+      {
+        "deviceId": "12345678901234567890",
+        "success": true,
+        "status": 200,
+        "responseSize": 779608
+      }
+    ]
+  }
+}
