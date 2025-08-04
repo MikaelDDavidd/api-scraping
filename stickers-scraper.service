@@ -1,0 +1,31 @@
+[Unit]
+Description=Stickers Scraper - Continuous VPS Mode
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/stickers-scraper/api-scraping
+ExecStart=/usr/bin/node index.js vps
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+Environment=TZ=America/Recife
+
+# Graceful shutdown
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Resource limits (ajustar conforme VPS)
+LimitNOFILE=65536
+MemoryMax=1G
+
+# Logging
+SyslogIdentifier=stickers-scraper
+
+[Install]
+WantedBy=multi-user.target

@@ -3,6 +3,8 @@
 const { config, validateConfig } = require('./config/config');
 const PackProcessor = require('./services/packProcessor');
 const OptimizedPackProcessor = require('./services/optimizedPackProcessor');
+const MetricsLogger = require('./services/metricsLogger');
+const PersistentStateManager = require('./services/persistentStateManager');
 const { info, error, warn } = require('./utils/logger');
 
 // Validar configurações no início
@@ -28,6 +30,10 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
+// Variáveis globais para cleanup
+let globalMetricsLogger = null;
+let globalStateManager = null;
+
 // Handler para sinal de parada
 process.on('SIGINT', () => {
   info('Recebido sinal de parada (SIGINT)');
@@ -40,14 +46,25 @@ process.on('SIGTERM', () => {
 });
 
 async function gracefulShutdown() {
-  info('Iniciando parada graceful...');
+  info('🛑 Iniciando parada graceful...');
   
   try {
-    // Limpeza de recursos se necessário
-    info('Recursos limpos com sucesso');
+    // Salvar estado persistente se existir
+    if (globalStateManager) {
+      info('💾 Salvando estado persistente...');
+      await globalStateManager.saveState();
+    }
+    
+    // Finalizar sessão de métricas se existir
+    if (globalMetricsLogger) {
+      info('📊 Finalizando sessão de métricas...');
+      await globalMetricsLogger.endSession('interrupted');
+    }
+    
+    info('✅ Recursos limpos com sucesso');
     process.exit(0);
   } catch (err) {
-    error('Erro durante parada graceful', err);
+    error('❌ Erro durante parada graceful', err);
     process.exit(1);
   }
 }
@@ -141,17 +158,27 @@ async function main() {
         break;
 
       case 'continuous':
-        // ⭐ NOVO: Modo contínuo como API original
+      case 'daemon':
+      case 'vps':
+        // ⭐ NOVO: Modo contínuo otimizado para VPS
         const continuousKeywords = args.slice(1);
         const keywordsForContinuous = continuousKeywords.length > 0 ? continuousKeywords : config.scraping.keywords;
         
-        info(`🔄 Modo: Scraping contínuo (como API original)`);
+        info(`🔄 Modo: Scraping contínuo VPS (24/7)`);
         info(`Keywords: ${keywordsForContinuous.join(', ')}`);
         info(`Locales: ${config.scraping.locales.map(l => l.locale).join(', ')}`);
-        info(`⚠️  Pressione Ctrl+C para parar`);
+        info(`⚠️  Pressione Ctrl+C para parar graciosamente`);
         
-        // Inicia o scraping contínuo (nunca termina)
-        await processor.startContinuousScraping(keywordsForContinuous);
+        // Inicializar logger de métricas e estado persistente
+        const metricsLogger = new MetricsLogger();
+        const stateManager = new PersistentStateManager();
+        
+        // Definir globalmente para cleanup
+        globalMetricsLogger = metricsLogger;
+        globalStateManager = stateManager;
+        
+        // Inicia o scraping contínuo com persistência
+        await startContinuousVPSScraping(processor, metricsLogger, stateManager, keywordsForContinuous);
         return; // Nunca chegará aqui
 
       case 'optimized':
@@ -203,6 +230,132 @@ async function main() {
 }
 
 /**
+ * Função para scraping contínuo otimizado para VPS
+ */
+async function startContinuousVPSScraping(processor, metricsLogger, stateManager, keywords) {
+  const locales = config.scraping.locales;
+  let cycleStartTime = Date.now();
+  
+  try {
+    // Carregar estado persistente
+    await stateManager.loadState();
+    
+    // Iniciar sessão de métricas
+    await metricsLogger.startSession('continuous_vps', 
+      locales.map(l => l.locale), 
+      keywords
+    );
+    
+    info('🚀 Iniciando scraping contínuo VPS');
+    info(`📊 Estado atual: Locale ${stateManager.currentState.currentLocaleIndex}/${locales.length}, Keyword ${stateManager.currentState.currentKeywordIndex}/${keywords.length}`);
+    
+    // Loop infinito
+    while (true) {
+      try {
+        // Verificar se completou um ciclo
+        if (stateManager.currentState.currentLocaleIndex >= locales.length) {
+          await stateManager.completeCycle();
+          const cycleTime = (Date.now() - cycleStartTime) / (1000 * 60 * 60); // horas
+          await stateManager.addRuntimeHours(cycleTime);
+          
+          info(`✅ Ciclo ${stateManager.currentState.cyclesCompleted} completo em ${cycleTime.toFixed(2)}h`);
+          await metricsLogger.logEvent('cycle_completed', null, {
+            cycle_number: stateManager.currentState.cyclesCompleted,
+            cycle_duration_hours: cycleTime,
+            total_runtime_hours: stateManager.currentState.totalRuntimeHours
+          });
+          
+          cycleStartTime = Date.now();
+          continue;
+        }
+        
+        // Obter locale e keyword atuais
+        const currentLocale = locales[stateManager.currentState.currentLocaleIndex];
+        const currentKeyword = keywords[stateManager.currentState.currentKeywordIndex];
+        
+        info(`🎯 Processando: ${currentLocale.locale} + "${currentKeyword}" (Página ${stateManager.currentState.currentPage})`);
+        
+        // Processar packs da keyword atual
+        const searchResult = await processor.processKeywordSearch(
+          [currentKeyword], 
+          currentLocale.locale,
+          stateManager.currentState.currentPage
+        );
+        
+        await metricsLogger.logEvent('keyword_processed', null, {
+          locale: currentLocale.locale,
+          keyword: currentKeyword,
+          page: stateManager.currentState.currentPage,
+          packs_found: searchResult.totalPacksFound || 0,
+          packs_processed: searchResult.totalPacksProcessed || 0
+        });
+        
+        // Atualizar métricas
+        if (searchResult.totalPacksFound) {
+          metricsLogger.metrics.packsFound += searchResult.totalPacksFound;
+        }
+        if (searchResult.totalPacksProcessed) {
+          metricsLogger.metrics.packsProcessed += searchResult.totalPacksProcessed;
+        }
+        
+        // Verificar se tem mais páginas
+        const hasMorePages = searchResult.hasMorePages;
+        
+        if (hasMorePages && stateManager.currentState.currentPage < 10) {
+          // Próxima página da mesma keyword
+          await stateManager.updateCurrentPage(stateManager.currentState.currentPage + 1);
+        } else {
+          // Próxima keyword
+          await stateManager.updateCurrentPage(0);
+          
+          if (stateManager.currentState.currentKeywordIndex + 1 >= keywords.length) {
+            // Próximo locale
+            await stateManager.updateKeywordIndex(0);
+            await stateManager.updateLocaleIndex(stateManager.currentState.currentLocaleIndex + 1);
+          } else {
+            // Próxima keyword do mesmo locale
+            await stateManager.updateKeywordIndex(stateManager.currentState.currentKeywordIndex + 1);
+          }
+        }
+        
+        // Status report a cada 10 iterações
+        const progress = stateManager.getProgress(locales.length, keywords.length);
+        if (progress.currentStep % 10 === 0) {
+          const stats = metricsLogger.getSessionStats();
+          info(`📊 Progresso: ${progress.progressPercentage}% - Packs: ${stats.packsProcessed} processados, ${stats.packsFailed} falharam`);
+        }
+        
+        // Delay entre requests para não sobrecarregar a API
+        const delayMs = config.scraping.delayBetweenRequests;
+        if (delayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        
+      } catch (iterationError) {
+        error('❌ Erro na iteração do scraping contínuo', iterationError);
+        
+        await metricsLogger.logError('iteration_error', iterationError, {
+          locale: locales[stateManager.currentState.currentLocaleIndex]?.locale,
+          keyword: keywords[stateManager.currentState.currentKeywordIndex],
+          page: stateManager.currentState.currentPage
+        });
+        
+        // Aguardar um pouco antes de tentar novamente
+        await new Promise(resolve => setTimeout(resolve, 30000)); // 30s
+      }
+    }
+    
+  } catch (fatalError) {
+    error('❌ Erro fatal no scraping contínuo VPS', fatalError);
+    
+    await metricsLogger.logError('fatal_error', fatalError);
+    await metricsLogger.endSession('failed');
+    
+    process.exit(1);
+  }
+}
+
+/**
  * Mostra ajuda do programa
  */
 function showHelp() {
@@ -217,7 +370,9 @@ Comandos disponíveis:
   full [palavras]       Processamento completo (recomendados + keywords)
   optimized [palavras]  🚀 Scraping OTIMIZADO (usa descobertas da API)
   turbo [palavras]      🚀 Alias para 'optimized'
-  continuous [palavras] ⭐ Scraping contínuo (como API original) - roda infinitamente
+  continuous [palavras] ⭐ Scraping contínuo VPS com persistência - roda 24/7
+  daemon [palavras]     ⭐ Alias para 'continuous'
+  vps [palavras]        ⭐ Alias para 'continuous'
   test                  Modo de teste (1 pack por locale)
   stats                 Mostra estatísticas da sessão atual
   help, --help, -h      Mostra esta ajuda
@@ -229,9 +384,18 @@ Exemplos:
   node index.js full amor trabalho        # Completo com keywords customizadas
   node index.js optimized                 # 🚀 Scraping otimizado (RECOMENDADO)
   node index.js turbo memes love          # 🚀 Scraping otimizado com keywords específicas
-  node index.js continuous                # ⭐ Scraping contínuo (para produção)
-  node index.js continuous memes love     # Scraping contínuo com keywords específicas
+  node index.js continuous                # ⭐ Scraping contínuo VPS (PRODUÇÃO)
+  node index.js vps memes love            # ⭐ Scraping VPS com keywords específicas
+  node index.js daemon                    # ⭐ Modo daemon para VPS
   node index.js test                      # Teste rápido
+
+⭐ MODO VPS (NOVIDADE):
+  - Estado persistente: retoma de onde parou após reinicialização
+  - Métricas detalhadas salvas no Supabase
+  - Logs de erro estruturados para debugging
+  - Graceful shutdown com Ctrl+C
+  - Ciclos infinitos com controle de progresso
+  - Otimizado para execução 24/7 na VPS Oracle Cloud
 
 🚀 MODO OTIMIZADO (Novidade):
   - Usa endpoint leve (v1) quando possível (~53KB vs ~780KB)
