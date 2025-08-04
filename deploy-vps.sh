@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Script de deploy para VPS Oracle Cloud
+# Script de deploy para VPS Oracle Cloud com PM2
 # Execute este script na VPS após fazer upload dos arquivos
 
 set -e
 
-echo "🚀 Iniciando deploy do Stickers Scraper na VPS..."
+echo "🚀 Iniciando deploy do Stickers Scraper na VPS com PM2..."
 
 # Cores para output
 RED='\033[0;31m'
@@ -47,6 +47,14 @@ fi
 log "Versão do Node.js: $(node --version)"
 log "Versão do npm: $(npm --version)"
 
+# Instalar PM2 globalmente
+log "Instalando PM2..."
+if ! command -v pm2 &> /dev/null; then
+    sudo npm install -g pm2
+fi
+
+log "Versão do PM2: $(pm2 --version)"
+
 # Verificar se Sharp pode ser compilado
 log "Verificando dependências para Sharp..."
 sudo apt-get install -y build-essential libvips-dev
@@ -80,74 +88,122 @@ fi
 log "Criando diretórios..."
 mkdir -p logs temp
 
-# Configurar logrotate
-log "Configurando rotação de logs..."
-sudo tee /etc/logrotate.d/stickers-scraper > /dev/null <<EOF
+# Configurar logrotate para PM2
+log "Configurando rotação de logs do PM2..."
+sudo tee /etc/logrotate.d/stickers-scraper-pm2 > /dev/null <<EOF
 /home/ubuntu/stickers-scraper/api-scraping/logs/*.log {
     daily
     missingok
-    rotate 7
+    rotate 14
     compress
     delaycompress
     notifempty
     sharedscripts
     postrotate
-        sudo systemctl reload stickers-scraper.service > /dev/null 2>&1 || true
+        pm2 reloadLogs > /dev/null 2>&1 || true
     endscript
 }
 EOF
 
-# Instalar service systemd
-log "Instalando serviço systemd..."
-sudo cp stickers-scraper.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable stickers-scraper.service
+# Configurar PM2 para auto-start
+log "Configurando PM2 para auto-start..."
+pm2 startup ubuntu -u ubuntu --hp /home/ubuntu
 
-# Criar script de monitoramento
-log "Criando script de monitoramento..."
+# Instalar logrotate do PM2
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 30
+pm2 set pm2-logrotate:compress true
+
+# Criar script de monitoramento PM2
+log "Criando script de monitoramento PM2..."
 cat > monitor.sh << 'EOF'
 #!/bin/bash
 
-# Script de monitoramento do Stickers Scraper
+# Script de monitoramento do Stickers Scraper com PM2
 
 case "$1" in
     status)
-        echo "=== Status do Serviço ==="
-        sudo systemctl status stickers-scraper.service --no-pager
+        echo "=== Status dos Processos PM2 ==="
+        pm2 status
         echo ""
-        echo "=== Últimas 20 linhas do log ==="
-        sudo journalctl -u stickers-scraper.service -n 20 --no-pager
+        echo "=== Informações detalhadas ==="
+        pm2 describe stickers-scraper-vps
         ;;
     start)
-        echo "Iniciando serviço..."
-        sudo systemctl start stickers-scraper.service
+        echo "Iniciando aplicação principal..."
+        pm2 start ecosystem.config.js --only stickers-scraper-vps
         ;;
     stop)
-        echo "Parando serviço..."
-        sudo systemctl stop stickers-scraper.service
+        echo "Parando aplicação principal..."
+        pm2 stop stickers-scraper-vps
         ;;
     restart)
-        echo "Reiniciando serviço..."
-        sudo systemctl restart stickers-scraper.service
+        echo "Reiniciando aplicação principal..."
+        pm2 restart stickers-scraper-vps
+        ;;
+    reload)
+        echo "Recarregando aplicação (zero downtime)..."
+        pm2 reload stickers-scraper-vps
         ;;
     logs)
         echo "=== Logs em tempo real (Ctrl+C para sair) ==="
-        sudo journalctl -u stickers-scraper.service -f
+        pm2 logs stickers-scraper-vps
         ;;
     test)
         echo "Executando teste..."
-        node index.js test
+        pm2 start ecosystem.config.js --only stickers-scraper-test
+        sleep 5
+        pm2 logs stickers-scraper-test --lines 20
+        ;;
+    stats)
+        echo "Executando relatório de estatísticas..."
+        pm2 start ecosystem.config.js --only stickers-scraper-stats
+        sleep 3
+        pm2 logs stickers-scraper-stats --lines 50
+        ;;
+    monit)
+        echo "Abrindo monitor PM2..."
+        pm2 monit
+        ;;
+    delete)
+        echo "Removendo todos os processos..."
+        pm2 delete all
+        ;;
+    deploy)
+        echo "Deploy completo..."
+        pm2 stop all
+        pm2 delete all
+        pm2 start ecosystem.config.js
+        pm2 save
+        ;;
+    save)
+        echo "Salvando configuração atual..."
+        pm2 save
         ;;
     *)
-        echo "Uso: $0 {status|start|stop|restart|logs|test}"
+        echo "Uso: $0 {status|start|stop|restart|reload|logs|test|stats|monit|delete|deploy|save}"
         echo ""
-        echo "Comandos disponíveis:"
-        echo "  status  - Mostra status do serviço e últimos logs"
-        echo "  start   - Inicia o serviço"
-        echo "  stop    - Para o serviço"
-        echo "  restart - Reinicia o serviço"
-        echo "  logs    - Mostra logs em tempo real"
-        echo "  test    - Executa teste do scraper"
+        echo "Comandos PM2 disponíveis:"
+        echo "  status   - Mostra status de todos os processos"
+        echo "  start    - Inicia aplicação principal"
+        echo "  stop     - Para aplicação principal"
+        echo "  restart  - Reinicia aplicação principal"
+        echo "  reload   - Recarrega com zero downtime"
+        echo "  logs     - Mostra logs em tempo real"
+        echo "  test     - Executa teste do scraper"
+        echo "  stats    - Executa relatório de estatísticas"
+        echo "  monit    - Abre monitor interativo do PM2"
+        echo "  delete   - Remove todos os processos"
+        echo "  deploy   - Deploy completo (stop, delete, start)"
+        echo "  save     - Salva configuração atual"
+        echo ""
+        echo "Comandos PM2 diretos úteis:"
+        echo "  pm2 list                    - Lista processos"
+        echo "  pm2 logs                    - Todos os logs"
+        echo "  pm2 flush                   - Limpa logs"
+        echo "  pm2 reset <app>             - Reset stats"
+        echo "  pm2 show <app>              - Detalhes do app"
         exit 1
         ;;
 esac
@@ -164,17 +220,27 @@ else
     exit 1
 fi
 
-log "🎉 Deploy concluído com sucesso!"
+log "🎉 Deploy com PM2 concluído com sucesso!"
 echo ""
 echo "=== Próximos passos ==="
-echo "1. Iniciar serviço: ./monitor.sh start"
+echo "1. Deploy completo: ./monitor.sh deploy"
 echo "2. Ver status: ./monitor.sh status"
 echo "3. Ver logs: ./monitor.sh logs"
-echo "4. Parar serviço: ./monitor.sh stop"
+echo "4. Monitor interativo: ./monitor.sh monit"
+echo "5. Parar serviço: ./monitor.sh stop"
 echo ""
-echo "=== URLs úteis para monitoramento ==="
-echo "- Logs do sistema: sudo journalctl -u stickers-scraper.service -f"
-echo "- Status: sudo systemctl status stickers-scraper.service"
-echo "- Restart: sudo systemctl restart stickers-scraper.service"
+echo "=== Comandos PM2 úteis ==="
+echo "- Status: pm2 status"
+echo "- Logs: pm2 logs"
+echo "- Monitor: pm2 monit"
+echo "- Restart: pm2 restart all"
+echo "- Info detalhada: pm2 show stickers-scraper-vps"
 echo ""
-echo "O serviço irá iniciar automaticamente após reboot da VPS."
+echo "=== Auto-start configurado ==="
+echo "Execute 'pm2 save' após iniciar os processos para salvar o estado"
+echo "Os processos irão iniciar automaticamente após reboot da VPS"
+echo ""
+echo "=== Aplicações disponíveis ==="
+echo "- stickers-scraper-vps: Aplicação principal (contínua)"
+echo "- stickers-scraper-test: Executar testes"
+echo "- stickers-scraper-stats: Gerar estatísticas"

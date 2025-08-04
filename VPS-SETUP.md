@@ -1,6 +1,6 @@
-# Setup VPS Oracle Cloud - Stickers Scraper
+# Setup VPS Oracle Cloud - Stickers Scraper com PM2
 
-Este guia detalha como configurar o scraper para rodar 24/7 na VPS Oracle Cloud.
+Este guia detalha como configurar o scraper para rodar 24/7 na VPS Oracle Cloud usando PM2.
 
 ## 📋 Pré-requisitos
 
@@ -59,45 +59,69 @@ chmod +x deploy-vps.sh
 ./deploy-vps.sh
 ```
 
-## 🔧 Gerenciamento do Serviço
+## 🔧 Gerenciamento com PM2
 
-### Scripts de monitoramento:
+### Scripts de monitoramento PM2:
 ```bash
-# Ver status
+# Deploy completo (recomendado para primeira execução)
+./monitor.sh deploy
+
+# Ver status de todos os processos
 ./monitor.sh status
 
-# Iniciar serviço
+# Iniciar apenas aplicação principal
 ./monitor.sh start
 
-# Parar serviço  
+# Parar aplicação principal
 ./monitor.sh stop
 
-# Reiniciar serviço
+# Reiniciar aplicação principal
 ./monitor.sh restart
+
+# Recarregar sem downtime
+./monitor.sh reload
 
 # Ver logs em tempo real
 ./monitor.sh logs
 
 # Executar teste
 ./monitor.sh test
+
+# Gerar estatísticas
+./monitor.sh stats
+
+# Monitor interativo
+./monitor.sh monit
+
+# Salvar configuração atual
+./monitor.sh save
 ```
 
-### Comandos systemd diretos:
+### Comandos PM2 diretos:
 ```bash
-# Status detalhado
-sudo systemctl status stickers-scraper.service
+# Status de todos os processos
+pm2 status
 
-# Logs
-sudo journalctl -u stickers-scraper.service -f
+# Monitor interativo
+pm2 monit
 
-# Restart
-sudo systemctl restart stickers-scraper.service
+# Logs em tempo real
+pm2 logs
 
-# Habilitar auto-start
-sudo systemctl enable stickers-scraper.service
+# Logs apenas da aplicação principal
+pm2 logs stickers-scraper-vps
 
-# Desabilitar auto-start
-sudo systemctl disable stickers-scraper.service
+# Informações detalhadas
+pm2 show stickers-scraper-vps
+
+# Reiniciar todas as aplicações
+pm2 restart all
+
+# Salvar configuração para auto-start
+pm2 save
+
+# Ver comandos úteis
+./pm2-commands.sh
 ```
 
 ## 📊 Monitoramento
@@ -124,16 +148,26 @@ sudo systemctl disable stickers-scraper.service
 - Performance da API
 - Métricas otimização
 
-### 2. Via Logs do Sistema
+### 2. Via PM2 e Logs do Sistema
 ```bash
-# Logs gerais
-tail -f /var/log/syslog | grep stickers-scraper
+# Monitor PM2 interativo (melhor opção)
+pm2 monit
 
-# Logs específicos do serviço
-sudo journalctl -u stickers-scraper.service -f --since "1 hour ago"
+# Logs de todas as aplicações
+pm2 logs
 
-# Logs por data
-sudo journalctl -u stickers-scraper.service --since "2024-08-04 00:00:00"
+# Logs apenas da aplicação principal
+pm2 logs stickers-scraper-vps --lines 100
+
+# Logs com timestamp
+pm2 logs --timestamp
+
+# Logs em formato JSON
+pm2 logs --json
+
+# Arquivos de log diretos
+tail -f logs/pm2-combined.log
+tail -f logs/pm2-error.log
 ```
 
 ### 3. Monitoramento de Recursos
@@ -160,6 +194,9 @@ netstat -tlnp | grep node
 
 ### Comandos úteis:
 ```bash
+# Ver estado atual via PM2
+pm2 show stickers-scraper-vps
+
 # Ver estado atual (via banco)
 # Query no Supabase: SELECT * FROM scraping_persistent_state;
 
@@ -169,12 +206,22 @@ const PersistentStateManager = require('./services/persistentStateManager');
 const mgr = new PersistentStateManager();
 mgr.resetState().then(() => console.log('Estado resetado'));
 "
+
+# Restart completo com limpeza
+./monitor.sh delete
+./monitor.sh deploy
 ```
 
 ## 🛠️ Troubleshooting
 
-### Serviço não inicia:
+### Aplicação não inicia:
 ```bash
+# Verificar status PM2
+pm2 status
+
+# Ver logs de erro
+pm2 logs --err
+
 # Verificar configuração
 node -e "require('./config/config').validateConfig()"
 
@@ -183,6 +230,10 @@ npm install
 
 # Teste manual
 node index.js test
+
+# Restart do daemon PM2 (último recurso)
+pm2 kill
+pm2 resurrect
 ```
 
 ### Alta utilização de recursos:
@@ -208,11 +259,20 @@ client.from('packs').select('count').then(console.log);
 
 ### Logs não aparecem:
 ```bash
+# Limpar logs PM2
+pm2 flush
+
+# Recarregar logs
+pm2 reloadLogs
+
 # Verificar permissões
 sudo chown ubuntu:ubuntu /home/ubuntu/stickers-scraper/api-scraping/logs/
 
 # Recriar diretório
 mkdir -p logs temp
+
+# Verificar configuração de logs no ecosystem
+pm2 show stickers-scraper-vps
 ```
 
 ## 📈 Otimizações de Performance
@@ -233,8 +293,13 @@ MAX_CONCURRENT_UPLOADS=10
 
 ### 3. Para máxima eficiência:
 ```bash
-# Usar modo otimizado
-node index.js turbo
+# Parar aplicação atual
+pm2 stop stickers-scraper-vps
+
+# Iniciar em modo turbo (temporário)
+pm2 start index.js --name "stickers-turbo" -- turbo
+
+# Ou editar ecosystem.config.js e alterar args para 'turbo'
 ```
 
 ## 🔐 Segurança
@@ -269,11 +334,35 @@ cp .env .env.backup.$(date +%Y%m%d)
 
 ### Debug avançado:
 ```bash
-# Executar com debug máximo
-LOG_LEVEL=debug node index.js vps
+# Parar aplicação atual
+pm2 stop stickers-scraper-vps
+
+# Executar com debug máximo via PM2
+pm2 start index.js --name "debug-scraper" --log-date-format "YYYY-MM-DD HH:mm:ss Z" -- vps
+LOG_LEVEL=debug pm2 restart debug-scraper
 
 # Profiling de memória
-node --inspect index.js vps
+pm2 start index.js --name "profile-scraper" --node-args="--inspect" -- vps
+
+# Ver logs de debug
+pm2 logs debug-scraper
 ```
 
-Este setup garante execução estável 24/7 com monitoramento completo e recuperação automática de falhas.
+## 🎯 Vantagens do PM2
+
+### ✅ **Principais Benefícios:**
+- **Zero Downtime**: Recarregamento sem interrupção
+- **Auto-restart**: Reinicia automaticamente em caso de falha
+- **Monitoramento**: Interface rica de monitoramento
+- **Log Management**: Rotação automática de logs
+- **Cluster Mode**: Suporte a múltiplas instâncias (se necessário)
+- **Startup Scripts**: Auto-start após reboot
+- **Memory Management**: Restart automático por limite de memória
+
+### 🔧 **Recursos Específicos:**
+- **Graceful Shutdown**: Para aplicações com estado persistente
+- **Watch Mode**: Reiniciar ao detectar mudanças de arquivo
+- **Cron Jobs**: Executar tarefas agendadas
+- **Process File**: Configuração centralizada no ecosystem.config.js
+
+Este setup com PM2 garante execução estável 24/7 com monitoramento avançado e recuperação automática de falhas.
