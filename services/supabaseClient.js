@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { config } = require('../config/config');
 const { info, error, warn, uploadSuccess, uploadError } = require('../utils/logger');
+const LocalStorageClient = require('./localStorageClient');
 
 class SupabaseClient {
   constructor() {
@@ -17,6 +18,19 @@ class SupabaseClient {
     );
     
     this.bucketName = config.supabase.bucketName;
+    
+    // Decidir se usar storage local ou Supabase
+    this.useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true' || process.env.USE_LOCAL_STORAGE === '1';
+    
+    if (this.useLocalStorage) {
+      this.localStorageClient = new LocalStorageClient();
+      info('Usando storage local para arquivos', { 
+        path: process.env.LOCAL_STORAGE_PATH || '/home/ubuntu/stickers',
+        baseUrl: process.env.STORAGE_BASE_URL || 'http://localhost'
+      });
+    } else {
+      info('Usando Supabase Storage para arquivos');
+    }
   }
 
   /**
@@ -135,9 +149,13 @@ class SupabaseClient {
   }
 
   /**
-   * Faz upload de arquivo para o Storage
+   * Faz upload de arquivo para o Storage (Supabase ou Local)
    */
   async uploadFile(buffer, filePath, contentType = 'image/webp') {
+    if (this.useLocalStorage) {
+      return await this.localStorageClient.uploadFile(buffer, filePath, contentType);
+    }
+
     try {
       info(`Iniciando upload: ${filePath}`);
 
@@ -162,9 +180,13 @@ class SupabaseClient {
   }
 
   /**
-   * Verifica se arquivo existe no Storage
+   * Verifica se arquivo existe no Storage (Supabase ou Local)
    */
   async fileExists(filePath) {
+    if (this.useLocalStorage) {
+      return await this.localStorageClient.fileExists(filePath);
+    }
+
     try {
       const { data, error: listError } = await this.supabase.storage
         .from(this.bucketName)
@@ -185,9 +207,13 @@ class SupabaseClient {
   }
 
   /**
-   * Obtém URL pública do arquivo
+   * Obtém URL pública do arquivo (Supabase ou Local)
    */
   getPublicUrl(filePath) {
+    if (this.useLocalStorage) {
+      return this.localStorageClient.getPublicUrl(filePath);
+    }
+
     const { data } = this.supabase.storage
       .from(this.bucketName)
       .getPublicUrl(filePath);
@@ -196,56 +222,72 @@ class SupabaseClient {
   }
 
   /**
-   * Upload de pack completo (tray + stickers)
+   * Upload de pack completo (tray + stickers) - Híbrido
    */
   async uploadPack(packData, stickerFiles, trayFile) {
     const packId = packData.identifier;
     
     try {
-      info(`Iniciando upload do pack: ${packId}`);
-
-      // ✅ Pack já foi verificado no batch - pular verificação individual
-      // Comentário: verificação redundante removida para melhorar performance
-
-      // 2. Upload da tray (DEVE ser PNG para WhatsApp) - DIRETO NA RAIZ
-      let trayPath = null;
-      if (trayFile) {
-        trayPath = `${packData.identifier}/tray.png`; // Formato: tray + identifier
-        await this.uploadFile(trayFile.buffer, trayPath, 'image/png');
-      }
-
-      // 3. Upload dos stickers - DIRETO NA RAIZ
-      const uploadedStickers = [];
-      for (const sticker of stickerFiles) {
-        try {
-          const stickerPath = `${packData.identifier}/${sticker.filename}`;
-          
-          // Verificar se arquivo já existe para evitar re-upload
-          const exists = await this.fileExists(stickerPath);
-          if (!exists) {
-            await this.uploadFile(sticker.buffer, stickerPath);
-          }
-          
-          uploadedStickers.push({
-            ...sticker,
-            path: stickerPath,
-            publicUrl: this.getPublicUrl(stickerPath)
-          });
-
-        } catch (stickerError) {
-          error(`Erro ao fazer upload do sticker: ${sticker.filename}`, stickerError);
-          // Continua com os outros stickers mesmo se um falhar
-        }
-      }
-
-      // 4. Criar pack no banco
-      const dbPackId = await this.createPack({
-        ...packData,
-        tray: `tray.png` // Formato: tray + identifier
+      info(`Iniciando upload do pack: ${packId}`, { 
+        useLocalStorage: this.useLocalStorage 
       });
 
-      // 5. Criar stickers no banco
-      for (const sticker of uploadedStickers) {
+      let uploadResult;
+
+      if (this.useLocalStorage) {
+        // Upload local - não cria no banco, apenas salva arquivos
+        uploadResult = await this.localStorageClient.uploadPack(packData, stickerFiles, trayFile);
+      } else {
+        // Upload Supabase original
+        // 2. Upload da tray (DEVE ser PNG para WhatsApp)
+        let trayPath = null;
+        if (trayFile) {
+          trayPath = `${packData.identifier}/tray.png`;
+          await this.uploadFile(trayFile.buffer, trayPath, 'image/png');
+        }
+
+        // 3. Upload dos stickers
+        const uploadedStickers = [];
+        for (const sticker of stickerFiles) {
+          try {
+            const stickerPath = `${packData.identifier}/${sticker.filename}`;
+            
+            // Verificar se arquivo já existe para evitar re-upload
+            const exists = await this.fileExists(stickerPath);
+            if (!exists) {
+              await this.uploadFile(sticker.buffer, stickerPath);
+            }
+            
+            uploadedStickers.push({
+              ...sticker,
+              path: stickerPath,
+              publicUrl: this.getPublicUrl(stickerPath)
+            });
+
+          } catch (stickerError) {
+            error(`Erro ao fazer upload do sticker: ${sticker.filename}`, stickerError);
+            // Continua com os outros stickers mesmo se um falhar
+          }
+        }
+
+        uploadResult = {
+          packId,
+          uploadedStickers,
+          trayPath
+        };
+      }
+
+      // 4. Criar pack no banco (sempre no Supabase para metadados)
+      const dbPackId = await this.createPack({
+        ...packData,
+        tray: `tray.png`
+      });
+
+      // 5. Criar stickers no banco (sempre no Supabase para metadados)
+      const stickersToSave = this.useLocalStorage ? 
+        uploadResult.stickers : uploadResult.uploadedStickers;
+
+      for (const sticker of stickersToSave) {
         try {
           await this.createSticker({
             pack_id: dbPackId,
@@ -260,8 +302,8 @@ class SupabaseClient {
       info(`Pack upload completo`, {
         packId,
         dbPackId,
-        totalStickers: uploadedStickers.length,
-        successfulStickers: uploadedStickers.length
+        totalStickers: stickersToSave.length,
+        storageType: this.useLocalStorage ? 'local' : 'supabase'
       });
 
       return dbPackId;
