@@ -31,10 +31,16 @@ const config = {
     // User-Agent para requests (dinâmico como API original)
     userAgent: 'androidapp.stickerly/1.17.3 (Redmi 7; U; Android 29; pt-BR; {locale};)',
     
-    // Keywords combinadas (sticker.ly real + termos úteis brasileiros)
+    // Keywords combinadas (sticker.ly real + termos úteis brasileiros + trending 2024-2025)
     keywords: [
       // 🔥 Pesquisas em alta (dados reais do sticker.ly)
       'academia', 'flamengo', 'morango do amor', 'lula', 'bolsonaro', 'bom dia', 'chapolin',
+      
+      // 🏛️ Política e Memes Políticos Trending 2024-2025
+      'xandão', 'alexandre moraes', 'nikolas ferreira', 'nikole', 'tarcisio', 'tarcísio freitas',
+      'arthur lira', 'flavio dino', 'flávio dino', 'xandinho', 'ditador de toga', 'magnitsky',
+      'xandão sem disney', 'impeachment', 'stf', 'supremo', 'deputado', 'ministro',
+      'política brasil', 'memes políticos', 'congresso', 'senado', 'câmara',
       
       // 📂 Categorias oficiais
       'musica', 'amor', 'meme', 'tiktok', 'floptok', 'fofo', 'desenhos', 'futebol', 'kpop',
@@ -42,7 +48,41 @@ const config = {
       // 🇧🇷 Termos brasileiros úteis (nossa lista anterior)
       'brasil', 'carnaval', 'trabalho', 'família', 'amigos', 'feliz', 'triste', 'raiva', 
       'festa', 'natal', 'animado', 'brasileiro', 'whatsapp', 'engraçado', 'coração', 
-      'saudade', 'humor'
+      'saudade', 'humor',
+      
+      // 🎬 Filmes e Séries Trending 2024-2025
+      'ainda estou aqui', 'superman', 'avatar', 'mickey 17', 'lilo stitch', 'invocação mal',
+      'bridgerton', 'wandinha', 'wednesday', 'griselda', 'sintonia', 'bebê rena', 'baby reindeer',
+      'divertida mente', 'inside out', 'fallout', 'queen tears', 'quarteto fantástico',
+      'five nights freddys', 'completo desconhecido', 'bob dylan',
+      
+      // 🎵 Música e Artistas Trending
+      'só fé', 'grelo', 'fito paez', 'funk', 'sertanejo', 'pagode', 'rap', 'pop brasileiro',
+      'anitta', 'luisa sonza', 'ludmilla', 'wesley safadão', 'gusttavo lima', 'marilia mendonça',
+      
+      // 📱 Redes Sociais e Tech
+      'instagram', 'youtube', 'tiktok shop', 'streaming', 'netflix', 'disney plus', 'amazon prime',
+      'realidade virtual', 'inteligência artificial', 'ai', 'tecnologia',
+      
+      // 🏆 Esportes e Entretenimento
+      'bbb', 'big brother', 'copa mundo', 'olympics', 'olimpíadas', 'vasco', 'corinthians',
+      'palmeiras', 'são paulo', 'santos', 'botafogo', 'cruzeiro', 'atletico',
+      
+      // 💄 Lifestyle e Beleza
+      'maquiagem', 'skincare', 'academia fitness', 'dieta', 'receitas', 'culinária',
+      'viagem', 'sustentabilidade', 'meio ambiente', 'educação financeira',
+      
+      // 🎭 Expressões e Sentimentos Populares
+      'ansiedade', 'depressão', 'motivação', 'gratidão', 'fé', 'esperança', 'paz',
+      'segunda feira', 'sexta feira', 'fim semana', 'feriado', 'férias',
+      
+      // 🎪 Memes e Cultura Pop
+      'memes brasil', 'viral', 'trending', 'chapolin colorado', 'chaves', 'turma monica',
+      'pokemon', 'dragon ball', 'naruto', 'one piece', 'anime', 'manga',
+      
+      // 🌟 Celebridades e Influencers
+      'whindersson', 'felipe neto', 'kondzilla', 'casimiro', 'gaules', 'authentic games',
+      'luccas neto', 'kids', 'família', 'youtubers brasil'
     ],
     
     // Device IDs para rotação (para diversificar resultados)
