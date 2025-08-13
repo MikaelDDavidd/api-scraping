@@ -1,10 +1,9 @@
 module.exports = {
   apps: [
     {
-      // Aplicação principal - Modo VPS contínuo
-      name: 'stickers-scraper-vps',
-      script: 'index.js',
-      args: 'vps',
+      // Aplicação principal - Sistema Paralelo de Produção
+      name: 'stickers-parallel-scraper',
+      script: 'run_parallel_system.js',
       cwd: '/home/ubuntu/stickers-scraper/api-scraping',
       
       // Configurações de execução
@@ -19,7 +18,10 @@ module.exports = {
       // Configurações de ambiente
       env: {
         NODE_ENV: 'production',
-        TZ: 'America/Recife'
+        TZ: 'America/Recife',
+        ENABLE_PARALLEL_PROCESSING: 'true',
+        MAX_MEMORY_MB: '700',
+        CPU_USAGE_TARGET: '80'
       },
       
       // Logs
