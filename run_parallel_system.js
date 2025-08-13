@@ -42,47 +42,52 @@ class ParallelScrapingSystem {
   }
 
   /**
-   * Inicializa todo o sistema
+   * Inicializa todo o sistema (versão otimizada para hardware limitado)
    */
-  async initialize() {
-    info('🚀 Inicializando Sistema de Paralelização Completo...\n');
+  async initialize(scraperOnly = false) {
+    const mode = scraperOnly ? 'SCRAPER APENAS' : 'COMPLETO';
+    info(`🚀 Inicializando Sistema de Paralelização (${mode})...\n`);
 
     try {
-      // 1. ResourceMonitor - Monitoramento de recursos da VPS
-      info('1. Inicializando ResourceMonitor...');
-      this.components.resourceMonitor = new ResourceMonitor({
-        maxMemoryMB: 700, // 70% de 1GB da VPS
-        maxCPUPercent: 80,
-        monitorInterval: 5000, // 5s
-        enableAutoThrottling: true,
-        gcInterval: 60000 // 1 min
-      });
+      // 1. ResourceMonitor - Apenas se modo completo
+      if (!scraperOnly) {
+        info('1. Inicializando ResourceMonitor...');
+        this.components.resourceMonitor = new ResourceMonitor({
+          maxMemoryMB: 700, // 70% de 1GB da VPS
+          maxCPUPercent: 80,
+          monitorInterval: 5000, // 5s
+          enableAutoThrottling: true,
+          gcInterval: 60000 // 1 min
+        });
 
-      // Event listeners para alerts críticos
-      this.components.resourceMonitor.on('memoryAlert', (alert) => {
-        warn(`🚨 ALERTA MEMÓRIA: ${alert.current.toFixed(1)}% (${alert.usedMB}MB)`);
-        if (alert.current > 85) {
-          warn('Sistema sob alta pressão de memória!');
-        }
-      });
+        // Event listeners para alerts críticos
+        this.components.resourceMonitor.on('memoryAlert', (alert) => {
+          warn(`🚨 ALERTA MEMÓRIA: ${alert.current.toFixed(1)}% (${alert.usedMB}MB)`);
+          if (alert.current > 85) {
+            warn('Sistema sob alta pressão de memória!');
+          }
+        });
 
-      this.components.resourceMonitor.on('throttleActivated', (state) => {
-        warn(`🐌 THROTTLING ATIVADO: ${state.reason}`);
-      });
+        this.components.resourceMonitor.on('throttleActivated', (state) => {
+          warn(`🐌 THROTTLING ATIVADO: ${state.reason}`);
+        });
 
-      this.components.resourceMonitor.start();
-      info('   ✅ ResourceMonitor iniciado');
+        this.components.resourceMonitor.start();
+        info('   ✅ ResourceMonitor iniciado');
+      } else {
+        info('1. ResourceMonitor desabilitado (modo scraper)');
+      }
 
-      // 2. QueueManager - Gerenciamento de filas
+      // 2. QueueManager - Gerenciamento de filas (sempre necessário)
       info('\n2. Inicializando QueueManager...');
+      const queueSizes = scraperOnly ? 
+        { discovery: 20, light: 10, heavy: 5 } : // Tamanhos reduzidos para scraper
+        { discovery: 50, light: 20, heavy: 10 }; // Tamanhos normais
+      
       this.components.queueManager = new QueueManager({
-        saveInterval: 30000, // 30s - salvar estado frequentemente
+        saveInterval: scraperOnly ? 60000 : 30000, // Menos frequente em modo scraper
         persistencePath: './parallel_production_state',
-        maxQueueSize: {
-          discovery: 50, // Buffer grande para classificação
-          light: 20,     // Fila média para processamento rápido
-          heavy: 10      // Fila menor para processamento lento
-        }
+        maxQueueSize: queueSizes
       });
 
       await this.components.queueManager.start();
@@ -109,7 +114,7 @@ class ParallelScrapingSystem {
       await this.components.discoveryWorker.start();
       info('   ✅ Discovery Worker iniciado');
 
-      // 4. Light Processor - Processamento rápido
+      // 4. Light Processor - Processamento rápido (sempre ativo)
       info('\n4. Inicializando Light Processor...');
       this.components.lightProcessor = new LightProcessor(
         this.components.queueManager,
@@ -132,40 +137,48 @@ class ParallelScrapingSystem {
       await this.components.lightProcessor.start();
       info('   ✅ Light Processor iniciado');
 
-      // 5. Heavy Processor - Processamento completo + fallback
-      info('\n5. Inicializando Heavy Processor...');
-      this.components.heavyProcessor = new HeavyProcessor(
-        this.components.queueManager,
-        this.components.resourceMonitor
-      );
+      // 5. Heavy Processor - Apenas se modo completo
+      if (!scraperOnly) {
+        info('\n5. Inicializando Heavy Processor...');
+        this.components.heavyProcessor = new HeavyProcessor(
+          this.components.queueManager,
+          this.components.resourceMonitor
+        );
 
-      // Event listeners para heavy processor
-      this.components.heavyProcessor.on('taskCompleted', (data) => {
-        this.metrics.totalPacksProcessed++;
-        
-        if (data.taskName.includes('fallback')) {
-          this.metrics.fallbackTasksProcessed++;
-          info(`🔄 Heavy fallback processado: ${data.taskName} em ${data.processingTime}ms`);
-        } else {
-          this.metrics.heavyPacksProcessed++;
-          info(`🔨 Heavy pack processado: ${data.taskName} em ${data.processingTime}ms`);
-        }
-      });
+        // Event listeners para heavy processor
+        this.components.heavyProcessor.on('taskCompleted', (data) => {
+          this.metrics.totalPacksProcessed++;
+          
+          if (data.taskName.includes('fallback')) {
+            this.metrics.fallbackTasksProcessed++;
+            info(`🔄 Heavy fallback processado: ${data.taskName} em ${data.processingTime}ms`);
+          } else {
+            this.metrics.heavyPacksProcessed++;
+            info(`🔨 Heavy pack processado: ${data.taskName} em ${data.processingTime}ms`);
+          }
+        });
 
-      this.components.heavyProcessor.on('taskFailed', (data) => {
-        this.metrics.errors++;
-        warn(`❌ Heavy pack falhou: ${data.taskName} - ${data.error?.message}`);
-      });
+        this.components.heavyProcessor.on('taskFailed', (data) => {
+          this.metrics.errors++;
+          warn(`❌ Heavy pack falhou: ${data.taskName} - ${data.error?.message}`);
+        });
 
-      await this.components.heavyProcessor.initialize();
-      await this.components.heavyProcessor.start();
-      info('   ✅ Heavy Processor iniciado');
+        await this.components.heavyProcessor.initialize();
+        await this.components.heavyProcessor.start();
+        info('   ✅ Heavy Processor iniciado');
+      } else {
+        info('\n5. Heavy Processor desabilitado (modo scraper)');
+      }
 
       this.isRunning = true;
       this.startTime = Date.now();
       
-      info('\n🎉 Sistema de Paralelização Completo Iniciado com Sucesso!');
-      info('📊 Componentes ativos: Discovery + Light + Heavy + Fallback System');
+      const activeComponents = scraperOnly ? 
+        'Discovery + Light (modo scraper)' : 
+        'Discovery + Light + Heavy + Fallback System';
+      
+      info('\n🎉 Sistema de Paralelização Iniciado com Sucesso!');
+      info(`📊 Componentes ativos: ${activeComponents}`);
       
     } catch (err) {
       error('❌ Erro na inicialização do sistema:', err);
@@ -198,7 +211,100 @@ class ParallelScrapingSystem {
       this.printDetailedStatus();
     }, 600000); // 10 minutos
 
-    return { statusInterval, detailedInterval };
+    // Processa fila discovery e distribui para light/heavy a cada 10 segundos
+    const discoveryProcessorInterval = setInterval(() => {
+      if (!this.isRunning) {
+        clearInterval(discoveryProcessorInterval);
+        return;
+      }
+      
+      this.processDiscoveryQueue();
+    }, 10000); // 10 segundos
+
+    return { statusInterval, detailedInterval, discoveryProcessorInterval };
+  }
+
+  /**
+   * Processa fila discovery e distribui packs para light/heavy
+   */
+  async processDiscoveryQueue() {
+    if (!this.components.queueManager) {
+      return;
+    }
+
+    try {
+      // Processar alguns itens da fila discovery por vez
+      const maxItemsPerCycle = 5;
+      let itemsProcessed = 0;
+
+      while (itemsProcessed < maxItemsPerCycle) {
+        const discoveryItem = await this.components.queueManager.getFromQueue('discovery', 'discovery-processor');
+        
+        if (!discoveryItem) {
+          // Fila discovery vazia
+          break;
+        }
+
+        // Classificar o pack para determinar fila (light vs heavy)
+        const targetQueue = this.classifyPackForQueue(discoveryItem);
+        
+        // Converter item discovery para formato da fila alvo
+        const queueItem = {
+          packId: discoveryItem.packId,
+          name: discoveryItem.name,
+          source: discoveryItem.source,
+          locale: discoveryItem.locale,
+          resourceFiles: discoveryItem.resourceFiles,
+          resourceUrlPrefix: discoveryItem.resourceUrlPrefix,
+          isAnimated: discoveryItem.isAnimated,
+          classification: discoveryItem.classification,
+          authorName: discoveryItem.authorName,
+          viewCount: discoveryItem.viewCount || 0,
+          stickerCount: discoveryItem.resourceFiles?.length || 0
+        };
+
+        // Adicionar à fila apropriada
+        await this.components.queueManager.addToQueue(targetQueue, queueItem);
+        
+        itemsProcessed++;
+        
+        // Log do movimento
+        info(`📦 Pack movido: ${discoveryItem.packId} → ${targetQueue} queue`, {
+          stickerCount: queueItem.stickerCount,
+          isAnimated: discoveryItem.isAnimated
+        });
+      }
+
+      if (itemsProcessed > 0) {
+        info(`🔄 Processados ${itemsProcessed} itens da discovery queue`);
+      }
+
+    } catch (err) {
+      error('Erro ao processar discovery queue:', err);
+    }
+  }
+
+  /**
+   * Classifica pack para determinar fila (light vs heavy)
+   */
+  classifyPackForQueue(pack) {
+    const stickerCount = pack.resourceFiles?.length || 0;
+    const isAnimated = pack.isAnimated;
+    
+    // Se não há heavy processor ativo, tudo vai para light
+    if (!this.components.heavyProcessor) {
+      return 'light';
+    }
+    
+    // Critérios para fila heavy:
+    // - Packs animados com muitos stickers
+    // - Packs com mais de 15 stickers
+    if ((isAnimated && stickerCount > 8) || stickerCount > 15) {
+      return 'heavy';
+    }
+    
+    // Todos os outros vão para light
+    return 'light';
   }
 
   /**
@@ -320,8 +426,15 @@ async function main() {
   });
 
   try {
+    // Verificar argumentos de linha de comando
+    const scraperOnly = process.argv.includes('--scraper-only');
+    
+    if (scraperOnly) {
+      info('🔧 Modo scraper ativado (hardware limitado)');
+    }
+    
     // Inicializar sistema
-    await system.initialize();
+    await system.initialize(scraperOnly);
     
     // Iniciar monitoramento
     system.startMonitoring();
