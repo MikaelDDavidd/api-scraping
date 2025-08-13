@@ -440,13 +440,13 @@ class LightProcessor extends BaseWorker {
 
             if (result.success) {
               // Marcar como concluído na fila
-              this.queueManager.markCompleted('light', task.id);
+              await this.queueManager.markAsProcessed('light', task.id, result);
             } else if (result.reason === 'redirected_to_heavy') {
               // Já foi redirecionado para heavy queue
-              this.queueManager.markCompleted('light', task.id);
+              await this.queueManager.markAsProcessed('light', task.id, result);
             } else {
               // Marcar como falhou
-              this.queueManager.markFailed('light', task.id, result.reason);
+              await this.queueManager.markAsFailed('light', task.id, { message: result.reason });
             }
           } else {
             // Nenhuma tarefa disponível, aguardar

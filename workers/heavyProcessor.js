@@ -554,9 +554,9 @@ class HeavyProcessor extends BaseWorker {
               }, `process-heavy-pack-${heavyTask.packId}`);
 
               if (result.success) {
-                this.queueManager.markCompleted('heavy', heavyTask.id);
+                await this.queueManager.markAsProcessed('heavy', heavyTask.id, result);
               } else {
-                this.queueManager.markFailed('heavy', heavyTask.id, result.reason);
+                await this.queueManager.markAsFailed('heavy', heavyTask.id, { message: result.reason });
               }
               
               taskProcessed = true;
@@ -577,9 +577,9 @@ class HeavyProcessor extends BaseWorker {
             }, `fallback-light-pack-${lightTask.packId}`);
 
             if (result.success) {
-              this.queueManager.markCompleted('light', lightTask.id);
+              await this.queueManager.markAsProcessed('light', lightTask.id, result);
             } else {
-              this.queueManager.markFailed('light', lightTask.id, result.reason);
+              await this.queueManager.markAsFailed('light', lightTask.id, { message: result.reason });
             }
             
             taskProcessed = true;
