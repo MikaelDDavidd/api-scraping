@@ -50,31 +50,64 @@ class PackCache {
     try {
       info('📚 Carregando cache de packs existentes do Supabase...');
       
-      // Buscar apenas os identifiers (mais rápido)
-      const { data: packs, error: fetchError } = await this.supabaseClient.supabase
-        .from('packs')
-        .select('identifier')
-        .order('created_at', { ascending: false }); // Mais recentes primeiro
-      
-      if (fetchError) {
-        throw fetchError;
+      // 🚀 PAGINAÇÃO para buscar TODOS os packs (contornar limite padrão de 1000)
+      let allPacks = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      let totalFetched = 0;
+
+      info('🔄 Iniciando carregamento paginado de packs...');
+
+      while (hasMore) {
+        const rangeStart = page * pageSize;
+        const rangeEnd = (page + 1) * pageSize - 1;
+        
+        info(`📄 Carregando página ${page + 1} (packs ${rangeStart + 1}-${rangeEnd + 1})...`);
+        
+        const { data: packs, error: fetchError } = await this.supabaseClient.supabase
+          .from('packs')
+          .select('identifier')
+          .order('created_at', { ascending: false })
+          .range(rangeStart, rangeEnd);
+        
+        if (fetchError) {
+          throw fetchError;
+        }
+        
+        if (packs && packs.length > 0) {
+          allPacks.push(...packs);
+          totalFetched += packs.length;
+          info(`   ✅ Página ${page + 1}: ${packs.length} packs carregados (total: ${totalFetched})`);
+          
+          // Se retornou menos que pageSize, chegou ao fim
+          if (packs.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        } else {
+          hasMore = false;
+        }
+        
+        // Limite de segurança para não sobrecarregar
+        if (totalFetched >= this.maxCacheSize) {
+          warn(`🛑 Limite de segurança atingido: ${this.maxCacheSize} packs`);
+          break;
+        }
       }
+      
+      info(`📊 Carregamento paginado concluído: ${totalFetched} packs encontrados`);
       
       // Limpar cache atual
       this.existingPacks.clear();
       
       // Adicionar ao cache
       let addedCount = 0;
-      for (const pack of packs) {
+      for (const pack of allPacks) {
         if (pack.identifier) {
           this.existingPacks.add(pack.identifier);
           addedCount++;
-          
-          // Limite de segurança para memória
-          if (addedCount >= this.maxCacheSize) {
-            warn(`Cache limitado a ${this.maxCacheSize} packs (havia ${packs.length} total)`);
-            break;
-          }
         }
       }
       
@@ -83,8 +116,9 @@ class PackCache {
       
       const duration = Date.now() - startTime;
       info(`✅ Cache carregado: ${addedCount} packs em ${duration}ms`, {
-        totalInDB: packs.length,
+        totalInDB: totalFetched,
         cached: addedCount,
+        pages: page + 1,
         duration
       });
       
