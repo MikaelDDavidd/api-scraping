@@ -46,7 +46,7 @@ class StickerlyClient {
   }
 
   /**
-   * Executa request com retry automático
+   * Executa request com retry automático e tratamento melhorado de erros
    */
   async makeRequest(requestConfig, retries = config.scraping.maxRetries) {
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -54,17 +54,37 @@ class StickerlyClient {
         const response = await axios(requestConfig);
         return response.data;
       } catch (err) {
-        error(`Erro na tentativa ${attempt}/${retries}`, err, { 
+        const isLastAttempt = attempt >= retries;
+        const isTimeoutError = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
+        const isNetworkError = err.code === 'ECONNRESET' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT';
+        const isServerError = err.response?.status >= 500;
+        const isCloudflareError = err.response?.status === 521 || err.response?.status === 522;
+        
+        error(`Erro na tentativa ${attempt}/${retries}`, {
+          error: err.message,
+          code: err.code,
+          status: err.response?.status,
           url: requestConfig.url,
-          method: requestConfig.method 
+          method: requestConfig.method,
+          isTimeout: isTimeoutError,
+          isNetwork: isNetworkError,
+          isServer: isServerError,
+          isCloudflare: isCloudflareError
         });
         
-        if (attempt === retries) {
+        if (isLastAttempt) {
           throw err;
         }
         
-        // Delay exponencial entre tentativas
-        await this.delay(1000 * attempt);
+        // Delay mais longo para erros de servidor/rede
+        let delayMs = 1000 * attempt; // Base delay
+        
+        if (isTimeoutError || isNetworkError || isServerError || isCloudflareError) {
+          delayMs = Math.min(30000, 5000 * attempt); // Até 30s para erros graves
+          warn(`Erro de conectividade detectado, aguardando ${delayMs/1000}s antes de tentar novamente...`);
+        }
+        
+        await this.delay(delayMs);
       }
     }
   }
@@ -91,7 +111,7 @@ class StickerlyClient {
         'x-duid': this.getNextDeviceId(), // Rotacionar device ID
         'User-Agent': this.getUserAgent(locale)
       },
-      timeout: 30000
+      timeout: 60000 // Aumentado para 60s
     };
 
     try {
@@ -136,7 +156,7 @@ class StickerlyClient {
         keyword: keyword,
         cursor: cursor
       },
-      timeout: 30000
+      timeout: 60000 // Aumentado para 60s
     };
 
     try {

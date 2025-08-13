@@ -10,9 +10,14 @@ const config = {
   
   scraping: {
     maxPacksPerRun: parseInt(process.env.MAX_PACKS_PER_RUN) || 50,
-    delayBetweenRequests: parseInt(process.env.DELAY_BETWEEN_REQUESTS) || 2000,
-    maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
-    maxRuntime: parseInt(process.env.MAX_RUNTIME_HOURS) || 5, // Limite de 5 horas
+    delayBetweenRequests: parseInt(process.env.DELAY_BETWEEN_REQUESTS) || 3000, // Aumentado para 3s
+    maxRetries: parseInt(process.env.MAX_RETRIES) || 5, // Aumentado para 5 tentativas
+    maxRuntime: parseInt(process.env.MAX_RUNTIME_HOURS) || 8, // Aumentado para 8 horas
+    
+    // Novos timeouts melhorados
+    requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 60000, // 60s
+    downloadTimeout: parseInt(process.env.DOWNLOAD_TIMEOUT) || 120000, // 2 minutos
+    supabaseTimeout: parseInt(process.env.SUPABASE_TIMEOUT) || 30000, // 30s
     
     // Configurações de paginação (baseado na API original)
     maxPagesPerKeyword: parseInt(process.env.MAX_PAGES_PER_KEYWORD) || 460, // Como na API original
