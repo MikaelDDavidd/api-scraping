@@ -319,7 +319,7 @@ class HeavyProcessor extends BaseWorker {
           const stickerUrl = urlPrefix + stickerFile;
           
           // Download com timeout maior que light
-          const buffer = await this.stickerlyClient.downloadFile(stickerUrl, 30000); // 30s timeout
+          const buffer = await this.stickerlyClient.downloadFile(stickerUrl, 60000); // 60s timeout
           
           // Validação rigorosa (vs quick no light)
           const rigorousValidation = await this.rigorousValidateSticker(buffer, stickerFile);

@@ -256,7 +256,7 @@ class LightProcessor extends BaseWorker {
           const stickerUrl = urlPrefix + stickerFile;
           
           // Download com timeout menor
-          const buffer = await this.stickerlyClient.downloadFile(stickerUrl, 10000); // 10s timeout
+          const buffer = await this.stickerlyClient.downloadFile(stickerUrl, 60000); // 60s timeout
           
           // Validação rápida
           const quickValidation = await this.quickValidateSticker(buffer, stickerFile);
@@ -301,6 +301,11 @@ class LightProcessor extends BaseWorker {
    * Validação rápida de sticker
    */
   async quickValidateSticker(buffer, filename) {
+    // Verificar se buffer existe
+    if (!buffer || buffer.length === 0) {
+      return { valid: false, reason: 'empty_buffer' };
+    }
+
     // Verificar tamanho
     if (buffer.length > this.limits.maxStickerSizeKB * 1024) {
       return {
@@ -315,6 +320,34 @@ class LightProcessor extends BaseWorker {
         valid: false,
         reason: 'Formato de arquivo inválido'
       };
+    }
+
+    // Validação rigorosa de integridade RIFF/WebP
+    if (filename.toLowerCase().includes('.webp')) {
+      // WebP deve começar com 'RIFF' nos primeiros 4 bytes
+      if (buffer.length < 12 || buffer.toString('ascii', 0, 4) !== 'RIFF') {
+        return { valid: false, reason: 'corrupted_webp_header' };
+      }
+      
+      // Verificar se tem 'WEBP' na posição correta
+      if (buffer.toString('ascii', 8, 12) !== 'WEBP') {
+        return { valid: false, reason: 'corrupted_webp_format' };
+      }
+      
+      // Verificar tamanho do arquivo no header RIFF
+      try {
+        const fileSizeFromHeader = buffer.readUInt32LE(4) + 8;
+        if (Math.abs(buffer.length - fileSizeFromHeader) > 100) { // Tolerância de 100 bytes
+          return { valid: false, reason: 'incomplete_download_size_mismatch' };
+        }
+      } catch (err) {
+        return { valid: false, reason: 'corrupted_file_structure' };
+      }
+    }
+
+    // Tamanho mínimo para ser válido
+    if (buffer.length < 1024) { // 1KB mínimo
+      return { valid: false, reason: 'file_too_small' };
     }
 
     // Verificação adicional para WebP animado
