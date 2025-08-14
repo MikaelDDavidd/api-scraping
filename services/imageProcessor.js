@@ -98,6 +98,11 @@ class ImageProcessor {
             reason: !actuallyAnimated ? 'arquivo_nao_animado' : 'api_flag_estatico'
           });
           
+          // Verificar se arquivo ainda existe antes do processamento
+          if (!(await fs.pathExists(tempInputPath))) {
+            throw new Error(`Arquivo de entrada não encontrado: ${tempInputPath}`);
+          }
+          
           await execFileAsync('cwebp', [
             '-q', config.image.quality.toString(),
             '-resize', '512', '512',
@@ -485,11 +490,21 @@ class ImageProcessor {
    */
   async resizeAnimatedWebP(inputPath, outputPath, quality = config.image.quality) {
     try {
+      // Verificar se arquivo existe antes do processamento
+      if (!(await fs.pathExists(inputPath))) {
+        throw new Error(`Arquivo de entrada não encontrado: ${inputPath}`);
+      }
+      
       // Primeiro, obter informações do arquivo
       const info = await this.getWebPInfo(inputPath);
       
       if (info.totalFrames <= 1) {
         // Se não é realmente animado, usar processamento estático
+        // Verificar novamente se arquivo ainda existe
+        if (!(await fs.pathExists(inputPath))) {
+          throw new Error(`Arquivo de entrada desapareceu durante processamento: ${inputPath}`);
+        }
+        
         await execFileAsync('cwebp', [
           '-q', quality.toString(),
           '-resize', '512', '512',
@@ -689,10 +704,26 @@ class ImageProcessor {
    */
   async cleanupTemp() {
     try {
-      await fs.emptyDir(this.tempDir);
+      // Aguardar um pouco para garantir que processos terminem
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Tentar limpeza forçada
+      if (await fs.pathExists(this.tempDir)) {
+        await fs.remove(this.tempDir);
+        await fs.ensureDir(this.tempDir);
+      }
+      
       info('Diretório temporário limpo');
     } catch (err) {
       error('Erro ao limpar diretório temporário', err);
+      
+      // Criar novo tempDir se falhou
+      try {
+        this.tempDir = path.join(process.cwd(), 'temp', `temp_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`);
+        await fs.ensureDir(this.tempDir);
+      } catch (retryErr) {
+        error('Erro ao recriar diretório temporário', retryErr);
+      }
     }
   }
 

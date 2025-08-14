@@ -45,9 +45,9 @@ async function startScraperOnly() {
     info('💡 Todos os packs serão processados pelo Light Processor');
     info('📊 Use Ctrl+C para parar gracefully\n');
     
-    // Status inicial
-    setTimeout(() => {
-      system.printStatus();
+    // Status inicial detalhado
+    setTimeout(async () => {
+      await system.printStatus();
     }, 5000); // Status após 5 segundos
     
     // Manter processo ativo

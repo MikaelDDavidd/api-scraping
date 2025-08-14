@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { config } = require('../config/config');
 const { info, error, warn, uploadSuccess, uploadError } = require('../utils/logger');
 const LocalStorageClient = require('./localStorageClient');
+const TableLogger = require('../utils/tableLogger');
 
 class SupabaseClient {
   constructor() {
@@ -175,6 +176,19 @@ class SupabaseClient {
     try {
       info(`Criando pack: ${packData.name}`, { identifier: packData.identifier });
 
+      // Verificar se pack já existe
+      const { data: existingPack, error: checkError } = await this.supabase
+        .from('packs')
+        .select('id, identifier')
+        .eq('identifier', packData.identifier)
+        .single();
+
+      if (existingPack) {
+        info(`Pack já existe: ${packData.identifier}`, { id: existingPack.id });
+        return existingPack.id;
+      }
+
+      // Se não existir, criar novo
       const { data, error: insertError } = await this.supabase
         .from('packs')
         .insert({
@@ -207,6 +221,70 @@ class SupabaseClient {
     } catch (err) {
       error('Erro ao criar pack', err, { packData });
       throw err;
+    }
+  }
+
+  /**
+   * Consulta estatísticas do banco de dados
+   */
+  async getStats() {
+    try {
+      // Contar packs total
+      const { count: totalPacks, error: packsError } = await this.supabase
+        .from('packs')
+        .select('*', { count: 'exact', head: true });
+
+      if (packsError) throw packsError;
+
+      // Contar stickers total
+      const { count: totalStickers, error: stickersError } = await this.supabase
+        .from('stickers')
+        .select('*', { count: 'exact', head: true });
+
+      if (stickersError) throw stickersError;
+
+      // Packs por idioma
+      const { data: packsByLang, error: langError } = await this.supabase
+        .from('packs')
+        .select('lang')
+        .neq('lang', null);
+
+      if (langError) throw langError;
+
+      // Processar contagem por idioma
+      const langCounts = {};
+      packsByLang.forEach(pack => {
+        const lang = pack.lang || 'unknown';
+        langCounts[lang] = (langCounts[lang] || 0) + 1;
+      });
+
+      // Packs animados vs estáticos
+      const { count: animatedPacks, error: animatedError } = await this.supabase
+        .from('packs')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_animated', true);
+
+      if (animatedError) throw animatedError;
+
+      return {
+        totalPacks: totalPacks || 0,
+        totalStickers: totalStickers || 0,
+        animatedPacks: animatedPacks || 0,
+        staticPacks: (totalPacks || 0) - (animatedPacks || 0),
+        packsByLanguage: langCounts,
+        avgStickersPerPack: totalPacks > 0 ? Math.round((totalStickers || 0) / totalPacks) : 0
+      };
+
+    } catch (err) {
+      error('Erro ao consultar estatísticas do banco', err);
+      return {
+        totalPacks: 0,
+        totalStickers: 0,
+        animatedPacks: 0,
+        staticPacks: 0,
+        packsByLanguage: {},
+        avgStickersPerPack: 0
+      };
     }
   }
 
@@ -398,6 +476,14 @@ class SupabaseClient {
         totalStickers: stickersToSave.length,
         storageType: this.useLocalStorage ? 'local' : 'supabase'
       });
+
+      // Log detalhado com estatísticas atualizadas do banco
+      try {
+        const updatedStats = await this.getStats();
+        TableLogger.logPackAdded(packData, stickersToSave.length, updatedStats);
+      } catch (err) {
+        error('Erro ao obter estatísticas para log detalhado', err);
+      }
 
       return dbPackId;
 

@@ -6,6 +6,8 @@ const LightProcessor = require('./workers/lightProcessor');
 const HeavyProcessor = require('./workers/heavyProcessor');
 const { RealDiscoveryWorker } = require('./test_real_integration');
 const { info, error, warn } = require('./utils/logger');
+const TableLogger = require('./utils/tableLogger');
+const SupabaseClient = require('./services/supabaseClient');
 
 /**
  * Sistema completo de paralelização para produção na VPS
@@ -39,14 +41,24 @@ class ParallelScrapingSystem {
       fallbackTasksProcessed: 0,
       errors: 0
     };
+    
+    // Cliente Supabase para estatísticas
+    this.supabaseClient = new SupabaseClient();
   }
 
   /**
    * Inicializa todo o sistema (versão otimizada para hardware limitado)
    */
   async initialize(scraperOnly = false) {
-    const mode = scraperOnly ? 'SCRAPER APENAS' : 'COMPLETO';
-    info(`🚀 Inicializando Sistema de Paralelização (${mode})...\n`);
+    const mode = scraperOnly ? 'SCRAPER OTIMIZADO' : 'COMPLETO';
+    
+    // Banner de inicialização
+    TableLogger.logStartupBanner(mode);
+    
+    // Estatísticas iniciais do banco
+    info('\n📊 Consultando estatísticas iniciais do banco...');
+    const initialStats = await this.supabaseClient.getStats();
+    TableLogger.logBankStats(initialStats);
 
     try {
       // 1. ResourceMonitor - Apenas se modo completo
@@ -310,26 +322,33 @@ class ParallelScrapingSystem {
   /**
    * Imprime status básico
    */
-  printStatus() {
+  async printStatus() {
     const uptime = this.startTime ? Date.now() - this.startTime : 0;
-    const uptimeMin = Math.round(uptime / 60000);
-    
     const queueStats = this.components.queueManager?.getStats();
     const resourceStats = this.components.resourceMonitor?.getCurrentMetrics();
     
-    info('\n📊 === STATUS DO SISTEMA ===');
-    info(`⏱️ Uptime: ${uptimeMin} minutos`);
-    info(`🔍 Packs descobertos: ${this.metrics.totalPacksDiscovered}`);
-    info(`📦 Packs processados: ${this.metrics.totalPacksProcessed} (⚡${this.metrics.lightPacksProcessed} + 🔨${this.metrics.heavyPacksProcessed})`);
-    info(`🔄 Fallback tasks: ${this.metrics.fallbackTasksProcessed}`);
-    info(`❌ Errors: ${this.metrics.errors}`);
+    // Status do sistema
+    const memoryMB = resourceStats?.memory?.usedMB || 0;
+    const cpuPercent = resourceStats?.cpu?.percent || 0;
+    TableLogger.logSystemStatus(uptime, memoryMB, cpuPercent);
     
-    if (queueStats) {
-      info(`📋 Filas: Discovery=${queueStats.sizes.discovery}, Light=${queueStats.sizes.light}, Heavy=${queueStats.sizes.heavy}`);
-    }
+    // Progresso atual
+    TableLogger.logProgress(
+      this.metrics.totalPacksDiscovered,
+      this.metrics.totalPacksProcessed,
+      {
+        discovery: queueStats?.sizes?.discovery || 0,
+        light: queueStats?.sizes?.light || 0,
+        heavy: queueStats?.sizes?.heavy || 0
+      }
+    );
     
-    if (resourceStats) {
-      info(`💾 Recursos: ${resourceStats.memory.usedMB}MB (${resourceStats.memory.percent.toFixed(1)}%), CPU=${resourceStats.cpu.percent.toFixed(1)}%`);
+    // Estatísticas atuais do banco (a cada status)
+    try {
+      const currentStats = await this.supabaseClient.getStats();
+      TableLogger.logBankStats(currentStats);
+    } catch (err) {
+      error('Erro ao consultar estatísticas do banco para status', err);
     }
   }
 
