@@ -1,6 +1,5 @@
 const { EventEmitter } = require('events');
 const { info, error, warn } = require('../utils/logger');
-const dashboardManager = require('../utils/dashboardManager');
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -231,8 +230,7 @@ class QueueManager extends EventEmitter {
       queue.markFailed(itemId, errorObj, shouldRetry);
     }
     
-    // Simplificar logging - problema é no winston format, não na lógica
-    error(`Item falhou: ${itemId} - ${errorObj?.message || 'validation_failed'}`);
+    error(`Item falhou: ${itemId}`, { queueName, error: errorObj.message });
     this.emit('itemFailed', { queueName, itemId, error: errorObj });
   }
 
@@ -255,7 +253,7 @@ class QueueManager extends EventEmitter {
       queueStats[name] = queue.getStats ? queue.getStats() : {};
     }
     
-    const stats = {
+    return {
       sizes: queueSizes,
       stats: queueStats,
       workers: Array.from(this.workers.values()).map(worker => ({
@@ -266,36 +264,6 @@ class QueueManager extends EventEmitter {
         idleTime: Date.now() - worker.lastSeen
       }))
     };
-
-    // Atualizar dashboard com estatísticas das filas
-    this.updateDashboardStats(stats);
-    
-    return stats;
-  }
-
-  /**
-   * Atualiza estatísticas no dashboard
-   */
-  updateDashboardStats(stats) {
-    if (dashboardManager.isReady()) {
-      // Atualizar estatísticas da fila light
-      if (stats.stats.light) {
-        dashboardManager.updateQueueStats('light', {
-          pending: stats.sizes.light || 0,
-          processing: stats.stats.light.processing || 0,
-          completed: stats.stats.light.completed || 0
-        });
-      }
-
-      // Atualizar estatísticas da fila heavy
-      if (stats.stats.heavy) {
-        dashboardManager.updateQueueStats('heavy', {
-          pending: stats.sizes.heavy || 0,
-          processing: stats.stats.heavy.processing || 0,
-          completed: stats.stats.heavy.completed || 0
-        });
-      }
-    }
   }
 
   /**

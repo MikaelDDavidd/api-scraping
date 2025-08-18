@@ -359,6 +359,94 @@ class StickerlyClient {
   }
 
   /**
+   * Extrai informações melhoradas do pack incluindo author name
+   */
+  enhancePackData(pack) {
+    // Tentar extrair authorName de várias fontes possíveis
+    let authorName = null;
+    
+    // 1. Campo direto authorName
+    if (pack.authorName && pack.authorName.trim()) {
+      authorName = pack.authorName.trim();
+    }
+    // 2. Campo author
+    else if (pack.author && pack.author.trim()) {
+      authorName = pack.author.trim();
+    }
+    // 3. Campo publisher
+    else if (pack.publisher && pack.publisher.trim()) {
+      authorName = pack.publisher.trim();
+    }
+    // 4. Campo creator
+    else if (pack.creator && pack.creator.trim()) {
+      authorName = pack.creator.trim();
+    }
+    // 5. Extrair do título se formato "Nome - Título"
+    else if (pack.name && pack.name.includes(' - ')) {
+      const parts = pack.name.split(' - ');
+      if (parts.length >= 2 && parts[0].trim().length > 0) {
+        authorName = parts[0].trim();
+      }
+    }
+    // 6. Verificar se há user object
+    else if (pack.user && pack.user.name) {
+      authorName = pack.user.name.trim();
+    }
+    // 7. Verificar se há owner object
+    else if (pack.owner && pack.owner.name) {
+      authorName = pack.owner.name.trim();
+    }
+    
+    // Se ainda não encontrou, tentar pattern comum
+    if (!authorName && pack.name) {
+      // Padrões como "by Author", "de Author", etc.
+      const byMatch = pack.name.match(/(?:by|de|por)\s+([^-()]+)/i);
+      if (byMatch) {
+        authorName = byMatch[1].trim();
+      }
+    }
+    
+    // Fallback final
+    if (!authorName || authorName === '') {
+      authorName = 'Autor Desconhecido';
+    }
+    
+    // Limpar e validar authorName
+    authorName = authorName
+      .replace(/[^\w\s\-_.]/g, '') // Remove caracteres especiais
+      .trim()
+      .slice(0, 50); // Limita a 50 chars
+    
+    if (authorName === '') {
+      authorName = 'Autor Desconhecido';
+    }
+    
+    // Retornar pack com dados melhorados
+    return {
+      ...pack,
+      authorName: authorName,
+      // Melhorar outros campos também
+      viewCount: pack.viewCount || pack.views || pack.downloadCount || 0,
+      isAnimated: pack.isAnimated || pack.animated || this.detectAnimatedFromFiles(pack.resourceFiles),
+      // Limpar nome do pack
+      name: pack.name ? pack.name.trim().slice(0, 100) : 'Pack sem nome'
+    };
+  }
+
+  /**
+   * Detecta se pack é animado baseado nos arquivos
+   */
+  detectAnimatedFromFiles(resourceFiles) {
+    if (!Array.isArray(resourceFiles)) return false;
+    
+    // Verificar extensões que indicam animação
+    const animatedExtensions = ['.gif', '.webp'];
+    return resourceFiles.some(file => 
+      animatedExtensions.some(ext => file.toLowerCase().includes(ext))
+    );
+  }
+
+  /**
    * Processa lista de packs e filtra os válidos
    */
   filterValidPacks(packs) {
@@ -367,12 +455,18 @@ class StickerlyClient {
       return [];
     }
 
-    const validPacks = packs.filter(pack => this.validatePack(pack));
+    // Primeiro melhorar dados de cada pack
+    const enhancedPacks = packs.map(pack => this.enhancePackData(pack));
+    
+    // Depois validar
+    const validPacks = enhancedPacks.filter(pack => this.validatePack(pack));
     
     info(`Filtração de packs concluída`, {
       total: packs.length,
+      enhanced: enhancedPacks.length,
       valid: validPacks.length,
-      invalid: packs.length - validPacks.length
+      invalid: packs.length - validPacks.length,
+      authorsFound: validPacks.filter(p => p.authorName !== 'Autor Desconhecido').length
     });
 
     return validPacks;

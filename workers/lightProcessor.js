@@ -3,7 +3,6 @@ const StickerlyClient = require('../services/stickerlyClient');
 const ImageProcessor = require('../services/imageProcessor');
 const SupabaseClient = require('../services/supabaseClient');
 const { info, error, warn } = require('../utils/logger');
-const dashboardManager = require('../utils/dashboardManager');
 
 /**
  * Worker otimizado para processamento rápido de stickers simples/leves
@@ -106,13 +105,6 @@ class LightProcessor extends BaseWorker {
         stickerCount: pack.resourceFiles?.length || 0,
         isAnimated: pack.isAnimated
       });
-      
-      // Notificar dashboard
-      dashboardManager.startProcessingPack('light', {
-        id: packId,
-        name: pack.name,
-        stickers: pack.resourceFiles?.length || 0
-      });
 
       // Validação inicial para light processing
       const validation = this.validateLightPack(pack);
@@ -179,9 +171,6 @@ class LightProcessor extends BaseWorker {
           avgTimePerSticker: `${Math.round(processingTime / stickerResults.validStickers.length)}ms`
         });
 
-        // Notificar dashboard sobre sucesso
-        dashboardManager.finishProcessingPack('light', packId, true);
-
         return {
           success: true,
           packId,
@@ -193,7 +182,6 @@ class LightProcessor extends BaseWorker {
       } else {
         // Erro no upload
         this.updateLightMetrics(false, processingTime, stickerResults.validStickers.length, 1);
-        dashboardManager.finishProcessingPack('light', packId, false);
         return { success: false, reason: 'upload_failed' };
       }
 
@@ -201,7 +189,6 @@ class LightProcessor extends BaseWorker {
       const processingTime = Date.now() - startTime;
       this.updateLightMetrics(false, processingTime, 0, 0);
       error(`❌ Erro no processamento do pack leve: ${packId}`, err);
-      dashboardManager.finishProcessingPack('light', packId, false);
       throw err;
     } finally {
       // Limpeza rápida
@@ -253,9 +240,22 @@ class LightProcessor extends BaseWorker {
     const packId = pack.packId;
     const urlPrefix = pack.resourceUrlPrefix;
     
-    // Validar se pack tem resourceFiles
+    // Validar se pack tem resourceFiles - com tentativa de recuperação
     if (!pack.resourceFiles || !Array.isArray(pack.resourceFiles) || pack.resourceFiles.length === 0) {
-      throw new Error('Pack não tem stickers válidos para processar');
+      warn(`Pack ${packId} sem resourceFiles, tentando regenerar...`, {
+        hasResourceFiles: !!pack.resourceFiles,
+        isArray: Array.isArray(pack.resourceFiles),
+        length: pack.resourceFiles?.length || 0
+      });
+      
+      // Tentar regenerar resourceFiles se possível
+      if (this.canRegenerateResourceFiles(pack)) {
+        const stickerCount = pack.stickerCount || pack.resourceFiles?.length || 10; // Default 10
+        info(`Regenerando resourceFiles para pack ${packId} com ${stickerCount} stickers`);
+        pack.resourceFiles = this.generateResourceFiles(stickerCount, pack.isAnimated);
+      } else {
+        throw new Error(`Pack ${packId} não tem stickers válidos e não foi possível regenerar`);
+      }
     }
     
     info(`🔄 Processando ${pack.resourceFiles.length} stickers (modo light)...`);
@@ -549,6 +549,34 @@ class LightProcessor extends BaseWorker {
     
     this.lightMetrics.totalStickersProcessed += stickersProcessed;
     this.lightMetrics.uploadErrors += uploadErrors;
+  }
+
+  /**
+   * Gera resourceFiles quando não estão disponíveis
+   */
+  generateResourceFiles(stickerCount, isAnimated = false) {
+    const files = [];
+    const extension = isAnimated ? '.webp' : '.webp'; // Sempre WebP agora
+    
+    for (let i = 1; i <= stickerCount; i++) {
+      // Gerar nomes de arquivos comuns
+      const filename = `sticker_${i.toString().padStart(2, '0')}${extension}`;
+      files.push(filename);
+    }
+    
+    info(`Generated ${files.length} resourceFiles`, { stickerCount, isAnimated });
+    return files;
+  }
+
+  /**
+   * Valida pack antes de tentar regenerar resourceFiles
+   */
+  canRegenerateResourceFiles(pack) {
+    return (
+      pack.resourceUrlPrefix && 
+      pack.resourceUrlPrefix.trim() !== '' &&
+      (pack.stickerCount > 0 || pack.resourceFiles?.length > 0)
+    );
   }
 
   getLanguageFromLocale(locale) {

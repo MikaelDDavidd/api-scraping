@@ -103,28 +103,20 @@ class OptimizedStickerlyClient extends StickerlyClient {
 
       if (data?.result?.items) {
         // Converter formato v1 para formato padrão
-        const convertedPacks = data.result.items.map(item => {
-          // 🔧 CORREÇÃO: Extrair autor real da resposta da API
-          const authorName = item.authorName || item.user?.userName || 'Autor desconhecido';
-          
-          return {
-            packId: item.packId,
-            name: item.packName,
-            isAnimated: item.isAnimated,
-            resourceFiles: [item.resourceUrl.split('/').pop()], // Extrair filename da URL
-            resourceUrlPrefix: item.resourceUrl.substring(0, item.resourceUrl.lastIndexOf('/')),
-            viewCount: item.viewCount,
-            // ✅ CORRIGIDO: Usar autor real em vez de 'unknown'
-            authorName: authorName,
-            exportCount: item.exportCount || 0,
-            isPaid: item.isPaid || false,
-            thumb: item.thumb || true,
-            trayIndex: item.trayIndex || 0,
-            // Preservar dados adicionais do usuário
-            user: item.user,
-            isOfficial: item.isOfficial || false
-          };
-        });
+        const convertedPacks = data.result.items.map(item => ({
+          packId: item.packId,
+          name: item.packName,
+          isAnimated: item.isAnimated,
+          resourceFiles: [item.resourceUrl.split('/').pop()], // Extrair filename da URL
+          resourceUrlPrefix: item.resourceUrl.substring(0, item.resourceUrl.lastIndexOf('/')),
+          viewCount: item.viewCount,
+          // Campos mínimos para compatibilidade
+          authorName: 'unknown',
+          exportCount: 0,
+          isPaid: false,
+          thumb: true,
+          trayIndex: 0
+        }));
 
         info(`Endpoint leve: ${convertedPacks.length} packs (${JSON.stringify(data).length} bytes)`, {
           category: category || 'none'

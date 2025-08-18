@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Script com comandos PM2 úteis para o Stickers Scraper
-# Este arquivo contém comandos frequentemente usados
+# Comandos PM2 para Produção - Sistema Paralelo de Stickers
+# IMPORTANTE: Usar APENAS estes comandos para evitar múltiplas instâncias
 
-echo "🔧 Comandos PM2 para Stickers Scraper"
-echo "======================================"
+echo "🚀 Comandos PM2 para Produção Ubuntu"
+echo "===================================="
 
 # Cores para output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 cmd() {
@@ -25,24 +26,45 @@ section() {
     echo -e "${BLUE}=== $1 ===${NC}"
 }
 
-section "BÁSICOS"
-cmd "pm2 start ecosystem.config.js"
-desc "Inicia todas as aplicações definidas no ecosystem"
+warning() {
+    echo -e "${RED}⚠️ $1${NC}"
+}
 
-cmd "pm2 start ecosystem.config.js --only stickers-parallel-scraper"
-desc "Inicia apenas a aplicação principal"
+# Comandos principais recomendados
+section "COMANDOS RECOMENDADOS (usar estes)"
+cmd "./pm2-production.sh start"
+desc "Iniciar aplicação de produção (RECOMENDADO)"
 
-cmd "pm2 start ecosystem.config.js --only stickers-dashboard"
-desc "Inicia apenas o dashboard de monitoramento"
+cmd "./pm2-production.sh stop"
+desc "Parar aplicação"
 
-cmd "pm2 stop all"
-desc "Para todas as aplicações"
+cmd "./pm2-production.sh restart"
+desc "Reiniciar aplicação"
 
-cmd "pm2 restart all"
-desc "Reinicia todas as aplicações"
+cmd "./pm2-production.sh status"
+desc "Ver status detalhado"
 
-cmd "pm2 delete all"
-desc "Remove todas as aplicações"
+cmd "./pm2-production.sh logs"
+desc "Ver logs em tempo real"
+
+cmd "./pm2-production.sh deploy"
+desc "Deploy completo (git pull + restart)"
+
+section "COMANDOS PM2 BÁSICOS"
+cmd "pm2 list"
+desc "Lista processos rodando"
+
+cmd "pm2 info stickers-parallel-production"
+desc "Informações detalhadas da aplicação"
+
+cmd "pm2 restart stickers-parallel-production"
+desc "Reiniciar aplicação específica"
+
+cmd "pm2 stop stickers-parallel-production"
+desc "Parar aplicação específica"
+
+cmd "pm2 delete stickers-parallel-production"
+desc "Remover aplicação"
 
 section "MONITORAMENTO"
 cmd "pm2 status"
@@ -54,23 +76,17 @@ desc "Monitor interativo em tempo real"
 cmd "pm2 logs"
 desc "Logs de todas as aplicações em tempo real"
 
-cmd "pm2 logs stickers-parallel-scraper"
+cmd "pm2 logs stickers-scraper-vps"
 desc "Logs apenas da aplicação principal"
-
-cmd "pm2 logs stickers-dashboard"
-desc "Logs apenas do dashboard"
 
 cmd "pm2 logs --lines 100"
 desc "Mostra últimas 100 linhas dos logs"
 
 section "INFORMAÇÕES DETALHADAS"
-cmd "pm2 show stickers-parallel-scraper"
+cmd "pm2 show stickers-scraper-vps"
 desc "Informações detalhadas da aplicação principal"
 
-cmd "pm2 show stickers-dashboard"
-desc "Informações detalhadas do dashboard"
-
-cmd "pm2 describe stickers-parallel-scraper"
+cmd "pm2 describe stickers-scraper-vps"
 desc "Descrição completa da aplicação"
 
 cmd "pm2 list"
@@ -90,7 +106,7 @@ section "PERFORMANCE E ESTATÍSTICAS"
 cmd "pm2 reset all"
 desc "Reseta estatísticas de CPU/memória"
 
-cmd "pm2 reset stickers-parallel-scraper"
+cmd "pm2 reset stickers-scraper-vps"
 desc "Reseta estatísticas da aplicação principal"
 
 cmd "pm2 web"
@@ -113,7 +129,7 @@ section "RECARREGAMENTO ZERO DOWNTIME"
 cmd "pm2 reload all"
 desc "Recarga todas as apps sem downtime"
 
-cmd "pm2 reload stickers-parallel-scraper"
+cmd "pm2 reload stickers-scraper-vps"
 desc "Recarga app principal sem downtime"
 
 cmd "pm2 gracefulReload all"
@@ -126,7 +142,7 @@ desc "Apenas logs de erro"
 cmd "pm2 logs --out"
 desc "Apenas logs de output"
 
-cmd "pm2 logs stickers-parallel-scraper --timestamp"
+cmd "pm2 logs stickers-scraper-vps --timestamp"
 desc "Logs com timestamp"
 
 cmd "pm2 prettylist"
@@ -145,45 +161,62 @@ desc "Instala módulo de rotação de logs"
 cmd "pm2 install pm2-auto-pull"
 desc "Instala auto-pull do Git"
 
-section "DASHBOARD DE MONITORAMENTO"
-cmd "pm2 start ecosystem.config.js --only stickers-dashboard"
-desc "Inicia dashboard de monitoramento"
+section "LOGS E DEBUG"
+cmd "pm2 logs stickers-parallel-production"
+desc "Logs da aplicação em tempo real"
 
-cmd "pm2 start ecosystem.config.js --only stickers-dashboard --env demo"
-desc "Inicia dashboard em modo demonstração"
+cmd "pm2 logs stickers-parallel-production --lines 50"
+desc "Últimas 50 linhas dos logs"
 
-cmd "pm2 stop stickers-dashboard"
-desc "Para o dashboard"
+cmd "pm2 flush"
+desc "Limpar todos os logs"
 
-cmd "node dashboard.js --demo"
-desc "Executa dashboard localmente em modo demo"
+cmd "tail -f /home/ubuntu/api-scraping/logs/production.log"
+desc "Ver log de arquivo diretamente"
 
-section "COMANDOS ÚTEIS PARA PRODUÇÃO"
-cmd "./monitor.sh deploy"
-desc "Deploy completo (stop, delete, start, save)"
+cmd "tail -f /home/ubuntu/api-scraping/logs/production-error.log"
+desc "Ver apenas erros"
 
-cmd "./monitor.sh status"
-desc "Status detalhado via script personalizado"
+section "CONFIGURAÇÃO E PERSISTÊNCIA"
+cmd "pm2 save"
+desc "Salvar configuração atual"
 
-cmd "./monitor.sh monit"
-desc "Monitor via script personalizado"
+cmd "pm2 startup systemd -u ubuntu --hp /home/ubuntu"
+desc "Configurar auto-start no boot"
 
-cmd "pm2 start ecosystem.config.js --env production"
-desc "Inicia com variáveis de produção"
+cmd "pm2 resurrect"
+desc "Restaurar aplicações salvas"
+
+section "DEPLOY E ATUALIZAÇÃO"
+cmd "cd /home/ubuntu/api-scraping && git pull origin main"
+desc "Atualizar código do Git"
+
+cmd "npm install --production"
+desc "Instalar dependências"
+
+cmd "./pm2-production.sh deploy"
+desc "Deploy completo automatizado"
 
 section "TROUBLESHOOTING"
 cmd "pm2 kill"
-desc "Mata daemon PM2 (usar apenas em emergência)"
-
-cmd "pm2 update"
-desc "Atualiza daemon PM2"
+desc "Matar daemon PM2 (EMERGÊNCIA)"
 
 cmd "pm2 ping"
-desc "Testa se daemon PM2 está respondendo"
+desc "Testar se PM2 está respondendo"
 
-cmd "pm2 --help"
-desc "Ajuda completa do PM2"
+cmd "htop"
+desc "Ver uso de CPU/memória do sistema"
+
+cmd "df -h"
+desc "Ver espaço em disco"
+
+section "AVISOS IMPORTANTES"
+warning "NÃO USAR: pm2 start run_parallel_system.js (cria duplicatas)"
+warning "NÃO USAR: npm start (não é para produção)"
+warning "NÃO USAR: node run_parallel_system.js (sem PM2)"
+warning "SEMPRE usar apenas 1 instância!"
 
 echo ""
-echo -e "${BLUE}💡 DICA: Use './monitor.sh' para comandos simplificados${NC}"
-echo -e "${BLUE}📚 Docs: https://pm2.keymetrics.io/docs/usage/quick-start/${NC}"
+echo -e "${BLUE}📁 Figurinhas salvas em: /home/ubuntu/stickers/${NC}"
+echo -e "${BLUE}📝 Logs em: /home/ubuntu/api-scraping/logs/${NC}"
+echo -e "${GREEN}✅ Use './pm2-production.sh start' para produção${NC}"

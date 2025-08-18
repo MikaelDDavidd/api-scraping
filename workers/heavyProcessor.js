@@ -3,7 +3,6 @@ const StickerlyClient = require('../services/stickerlyClient');
 const ImageProcessor = require('../services/imageProcessor');
 const SupabaseClient = require('../services/supabaseClient');
 const { info, error, warn } = require('../utils/logger');
-const dashboardManager = require('../utils/dashboardManager');
 
 /**
  * Worker especializado para processamento de stickers complexos/pesados
@@ -122,13 +121,6 @@ class HeavyProcessor extends BaseWorker {
         isAnimated: pack.isAnimated,
         estimatedComplexity: this.calculateComplexityScore(pack)
       });
-      
-      // Notificar dashboard
-      dashboardManager.startProcessingPack('heavy', {
-        id: packId,
-        name: pack.name,
-        stickers: pack.resourceFiles?.length || 0
-      });
 
       // Validação para heavy processing
       const validation = this.validateHeavyPack(pack);
@@ -204,9 +196,6 @@ class HeavyProcessor extends BaseWorker {
           avgTimePerSticker: `${Math.round(processingTime / stickerResults.validStickers.length)}ms`
         });
 
-        // Notificar dashboard sobre sucesso
-        dashboardManager.finishProcessingPack('heavy', packId, true);
-
         return {
           success: true,
           packId,
@@ -220,13 +209,11 @@ class HeavyProcessor extends BaseWorker {
       } else {
         // Erro no upload
         this.updateHeavyMetrics(false, processingTime, stickerResults.validStickers.length, 1, qualityAnalysis.complexityScore);
-        dashboardManager.finishProcessingPack('heavy', packId, false);
         return { success: false, reason: 'upload_failed' };
       }
 
     } catch (err) {
       const processingTime = Date.now() - startTime;
-      dashboardManager.finishProcessingPack('heavy', packId, false);
       this.updateHeavyMetrics(false, processingTime, 0, 0, 0);
       error(`❌ Erro no processamento do pack pesado: ${packId}`, err);
       throw err;
@@ -315,9 +302,22 @@ class HeavyProcessor extends BaseWorker {
     const packId = pack.packId;
     const urlPrefix = pack.resourceUrlPrefix;
     
-    // Validar se pack tem resourceFiles
+    // Validar se pack tem resourceFiles - com tentativa de recuperação
     if (!pack.resourceFiles || !Array.isArray(pack.resourceFiles) || pack.resourceFiles.length === 0) {
-      throw new Error('Pack não tem stickers válidos para processar');
+      warn(`Pack ${packId} sem resourceFiles, tentando regenerar...`, {
+        hasResourceFiles: !!pack.resourceFiles,
+        isArray: Array.isArray(pack.resourceFiles),
+        length: pack.resourceFiles?.length || 0
+      });
+      
+      // Tentar regenerar resourceFiles se possível
+      if (this.canRegenerateResourceFiles(pack)) {
+        const stickerCount = pack.stickerCount || pack.resourceFiles?.length || 15; // Default 15 para heavy
+        info(`Regenerando resourceFiles para pack heavy ${packId} com ${stickerCount} stickers`);
+        pack.resourceFiles = this.generateResourceFiles(stickerCount, pack.isAnimated);
+      } else {
+        throw new Error(`Pack ${packId} não tem stickers válidos e não foi possível regenerar`);
+      }
     }
     
     info(`🔄 Processando ${pack.resourceFiles.length} stickers (modo heavy - qualidade máxima)...`);
@@ -569,7 +569,7 @@ class HeavyProcessor extends BaseWorker {
               if (result.success) {
                 await this.queueManager.markAsProcessed('heavy', heavyTask.id, result);
               } else {
-                await this.queueManager.markAsFailed('heavy', heavyTask.id, { message: result.reason || 'Unknown error' });
+                await this.queueManager.markAsFailed('heavy', heavyTask.id, { message: result.reason });
               }
               
               taskProcessed = true;
@@ -592,7 +592,7 @@ class HeavyProcessor extends BaseWorker {
             if (result.success) {
               await this.queueManager.markAsProcessed('light', lightTask.id, result);
             } else {
-              await this.queueManager.markAsFailed('light', lightTask.id, { message: result.reason || 'Unknown error' });
+              await this.queueManager.markAsFailed('light', lightTask.id, { message: result.reason });
             }
             
             taskProcessed = true;
@@ -684,6 +684,34 @@ class HeavyProcessor extends BaseWorker {
     if (complexityScore > 0) {
       this.heavyMetrics.complexityScores.push(complexityScore);
     }
+  }
+
+  /**
+   * Gera resourceFiles quando não estão disponíveis (versão heavy)
+   */
+  generateResourceFiles(stickerCount, isAnimated = false) {
+    const files = [];
+    const extension = '.webp'; // Sempre WebP
+    
+    for (let i = 1; i <= stickerCount; i++) {
+      // Gerar nomes de arquivos comuns para heavy (pode ser mais variado)
+      const filename = `sticker_${i.toString().padStart(2, '0')}${extension}`;
+      files.push(filename);
+    }
+    
+    info(`Generated ${files.length} resourceFiles for heavy processing`, { stickerCount, isAnimated });
+    return files;
+  }
+
+  /**
+   * Valida pack antes de tentar regenerar resourceFiles
+   */
+  canRegenerateResourceFiles(pack) {
+    return (
+      pack.resourceUrlPrefix && 
+      pack.resourceUrlPrefix.trim() !== '' &&
+      (pack.stickerCount > 0 || pack.resourceFiles?.length > 0)
+    );
   }
 
   getLanguageFromLocale(locale) {

@@ -63,42 +63,11 @@ class PackProcessor {
 
       // Salvar flag original da API para comparação
       const originalApiFlag = pack.isAnimated;
-      
-      // 🔍 VALIDAÇÃO INICIAL DO AUTOR (antes de qualquer processamento)
-      const initialAuthorCheck = {
-        packId,
-        authorName: pack.authorName,
-        authorType: typeof pack.authorName,
-        authorExists: !!pack.authorName,
-        authorValid: !!(pack.authorName && pack.authorName.trim().length > 0),
-        source,
-        locale
-      };
-      
-      info(`🔍 Validação inicial do autor`, initialAuthorCheck);
-      
-      // ⚠️ ALERTA PRECOCE se autor já está problemático na entrada
-      if (!pack.authorName || pack.authorName.trim().length === 0) {
-        warn(`⚠️ Pack recebido da API SEM autor válido`, {
-          packId,
-          packName: pack.name,
-          authorName: pack.authorName,
-          source,
-          locale,
-          apiResponse: {
-            hasAuthorName: 'authorName' in pack,
-            authorValue: pack.authorName,
-            authorType: typeof pack.authorName
-          }
-        });
-      }
-      
       info(`Pack obtido da API`, {
         packId,
         name: pack.name,
         originalApiFlag: originalApiFlag,
         authorName: pack.authorName,
-        authorStatus: pack.authorName ? '✅ Válido' : '❌ Inválido'
       });
 
       // Verificar se pack já foi processado nesta sessão
@@ -160,51 +129,16 @@ class PackProcessor {
         stickerCount: validStickers.length,
       });
 
-      // 🔍 DIAGNÓSTICO DETALHADO DO AUTOR
-      const authorDiagnostic = {
-        packId,
-        originalAuthor: pack.authorName,
-        authorType: typeof pack.authorName,
-        authorLength: pack.authorName?.length || 0,
-        authorTrimmed: pack.authorName?.trim() || '',
-        authorExists: !!pack.authorName,
-        authorValid: !!(pack.authorName && pack.authorName.trim().length > 0)
-      };
-      
-      info(`🔍 Diagnóstico do autor`, authorDiagnostic);
-      
-      // ⚠️ ALERTA se autor está vazio ou inválido
-      if (!pack.authorName || pack.authorName.trim().length === 0) {
-        error(`❌ PROBLEMA CRÍTICO: Pack sem autor válido detectado!`, {
-          packId,
-          packName: pack.name,
-          originalAuthor: pack.authorName,
-          source,
-          locale,
-          diagnostic: authorDiagnostic
-        });
-      }
-
       // Preparar dados do pack (USANDO A FLAG JÁ ATUALIZADA)
       const packData = {
         identifier: packId,
         name: pack.name || "Pack sem nome",
-        publisher: pack.authorName && pack.authorName.trim().length > 0 
-          ? pack.authorName.trim() 
-          : "Autor desconhecido",
+        publisher: pack.authorName || "Autor desconhecido",
         is_animated: pack.isAnimated || false, // Agora usa a flag corrigida
         lang: this.getLanguageFromLocale(locale),
         level: 0,
         zip_size: 0,
       };
-      
-      // 📊 LOG final do publisher usado
-      info(`📊 Publisher final`, {
-        packId,
-        originalAuthor: pack.authorName,
-        finalPublisher: packData.publisher,
-        wasChanged: packData.publisher !== pack.authorName
-      });
 
       // Validação final antes do upload
       const finalValidation = this.validateFinalPack(
