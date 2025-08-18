@@ -4,7 +4,7 @@ module.exports = {
       // Aplicação principal - Sistema Paralelo de Produção
       name: "stickers-parallel-scraper",
       script: "run_parallel_system.js",
-      cwd: "/home/ubuntu/stickers-scraper/api-scraping",
+      cwd: "/home/ubuntu/api-scraping",
 
       // Configurações de execução
       instances: 1, // Apenas 1 instância para evitar conflitos de estado
@@ -52,12 +52,52 @@ module.exports = {
       },
     },
 
+    {
+      // Dashboard de Monitoramento em Tempo Real
+      name: "stickers-dashboard",
+      script: "dashboard.js",
+      cwd: "/home/ubuntu/api-scraping",
+
+      // Configurações de execução
+      instances: 1,
+      exec_mode: "fork",
+
+      // Auto-restart desabilitado (dashboard é opcional)
+      autorestart: false,
+      max_restarts: 3,
+      restart_delay: 10000,
+
+      // Configurações de ambiente
+      env: {
+        NODE_ENV: "production",
+        TZ: "America/Recife",
+        DASHBOARD_MODE: "normal"
+      },
+
+      // Logs separados
+      log_file: "./logs/pm2-dashboard-combined.log",
+      out_file: "./logs/pm2-dashboard-out.log",
+      error_file: "./logs/pm2-dashboard-error.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+
+      // Configurações específicas
+      kill_timeout: 5000, // Dashboard pode terminar rapidamente
+      listen_timeout: 3000,
+      time: true,
+      merge_logs: true,
+
+      env_demo: {
+        NODE_ENV: "development",
+        DASHBOARD_MODE: "demo"
+      }
+    },
+
     // Aplicação de teste - Para executar testes periódicos
     // {
     //   name: "stickers-scraper-test",
     //   script: "index.js",
     //   args: "test",
-    //   cwd: "/home/ubuntu/stickers-scraper/api-scraping",
+    //   cwd: "/home/ubuntu/api-scraping",
 
     //   // Executar como cron job - não auto-restart
     //   autorestart: false,
@@ -72,29 +112,6 @@ module.exports = {
     //   env: {
     //     NODE_ENV: "development",
     //     LOG_LEVEL: "debug",
-    //   },
-    // },
-
-    // Aplicação de estatísticas - Para gerar relatórios
-    // {
-    //   name: "stickers-scraper-stats",
-    //   script: "index.js",
-    //   args: "stats",
-    //   cwd: "/home/ubuntu/stickers-scraper/api-scraping",
-
-    //   // Não auto-restart (executar sob demanda)
-    //   autorestart: false,
-    //   instances: 1,
-    //   exec_mode: "fork",
-
-    //   // Logs de estatísticas
-    //   log_file: "./logs/pm2-stats-combined.log",
-    //   out_file: "./logs/pm2-stats-out.log",
-    //   error_file: "./logs/pm2-stats-error.log",
-
-    //   env: {
-    //     NODE_ENV: "production",
-    //     LOG_LEVEL: "info",
     //   },
     // },
   ],

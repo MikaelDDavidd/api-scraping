@@ -3,6 +3,7 @@ const StickerlyClient = require('../services/stickerlyClient');
 const ImageProcessor = require('../services/imageProcessor');
 const SupabaseClient = require('../services/supabaseClient');
 const { info, error, warn } = require('../utils/logger');
+const dashboardManager = require('../utils/dashboardManager');
 
 /**
  * Worker especializado para processamento de stickers complexos/pesados
@@ -121,6 +122,13 @@ class HeavyProcessor extends BaseWorker {
         isAnimated: pack.isAnimated,
         estimatedComplexity: this.calculateComplexityScore(pack)
       });
+      
+      // Notificar dashboard
+      dashboardManager.startProcessingPack('heavy', {
+        id: packId,
+        name: pack.name,
+        stickers: pack.resourceFiles?.length || 0
+      });
 
       // Validação para heavy processing
       const validation = this.validateHeavyPack(pack);
@@ -196,6 +204,9 @@ class HeavyProcessor extends BaseWorker {
           avgTimePerSticker: `${Math.round(processingTime / stickerResults.validStickers.length)}ms`
         });
 
+        // Notificar dashboard sobre sucesso
+        dashboardManager.finishProcessingPack('heavy', packId, true);
+
         return {
           success: true,
           packId,
@@ -209,11 +220,13 @@ class HeavyProcessor extends BaseWorker {
       } else {
         // Erro no upload
         this.updateHeavyMetrics(false, processingTime, stickerResults.validStickers.length, 1, qualityAnalysis.complexityScore);
+        dashboardManager.finishProcessingPack('heavy', packId, false);
         return { success: false, reason: 'upload_failed' };
       }
 
     } catch (err) {
       const processingTime = Date.now() - startTime;
+      dashboardManager.finishProcessingPack('heavy', packId, false);
       this.updateHeavyMetrics(false, processingTime, 0, 0, 0);
       error(`❌ Erro no processamento do pack pesado: ${packId}`, err);
       throw err;
@@ -556,7 +569,7 @@ class HeavyProcessor extends BaseWorker {
               if (result.success) {
                 await this.queueManager.markAsProcessed('heavy', heavyTask.id, result);
               } else {
-                await this.queueManager.markAsFailed('heavy', heavyTask.id, { message: result.reason });
+                await this.queueManager.markAsFailed('heavy', heavyTask.id, { message: result.reason || 'Unknown error' });
               }
               
               taskProcessed = true;
@@ -579,7 +592,7 @@ class HeavyProcessor extends BaseWorker {
             if (result.success) {
               await this.queueManager.markAsProcessed('light', lightTask.id, result);
             } else {
-              await this.queueManager.markAsFailed('light', lightTask.id, { message: result.reason });
+              await this.queueManager.markAsFailed('light', lightTask.id, { message: result.reason || 'Unknown error' });
             }
             
             taskProcessed = true;

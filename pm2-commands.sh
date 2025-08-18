@@ -29,8 +29,11 @@ section "BÁSICOS"
 cmd "pm2 start ecosystem.config.js"
 desc "Inicia todas as aplicações definidas no ecosystem"
 
-cmd "pm2 start ecosystem.config.js --only stickers-scraper-vps"
+cmd "pm2 start ecosystem.config.js --only stickers-parallel-scraper"
 desc "Inicia apenas a aplicação principal"
+
+cmd "pm2 start ecosystem.config.js --only stickers-dashboard"
+desc "Inicia apenas o dashboard de monitoramento"
 
 cmd "pm2 stop all"
 desc "Para todas as aplicações"
@@ -51,17 +54,23 @@ desc "Monitor interativo em tempo real"
 cmd "pm2 logs"
 desc "Logs de todas as aplicações em tempo real"
 
-cmd "pm2 logs stickers-scraper-vps"
+cmd "pm2 logs stickers-parallel-scraper"
 desc "Logs apenas da aplicação principal"
+
+cmd "pm2 logs stickers-dashboard"
+desc "Logs apenas do dashboard"
 
 cmd "pm2 logs --lines 100"
 desc "Mostra últimas 100 linhas dos logs"
 
 section "INFORMAÇÕES DETALHADAS"
-cmd "pm2 show stickers-scraper-vps"
+cmd "pm2 show stickers-parallel-scraper"
 desc "Informações detalhadas da aplicação principal"
 
-cmd "pm2 describe stickers-scraper-vps"
+cmd "pm2 show stickers-dashboard"
+desc "Informações detalhadas do dashboard"
+
+cmd "pm2 describe stickers-parallel-scraper"
 desc "Descrição completa da aplicação"
 
 cmd "pm2 list"
@@ -81,7 +90,7 @@ section "PERFORMANCE E ESTATÍSTICAS"
 cmd "pm2 reset all"
 desc "Reseta estatísticas de CPU/memória"
 
-cmd "pm2 reset stickers-scraper-vps"
+cmd "pm2 reset stickers-parallel-scraper"
 desc "Reseta estatísticas da aplicação principal"
 
 cmd "pm2 web"
@@ -104,7 +113,7 @@ section "RECARREGAMENTO ZERO DOWNTIME"
 cmd "pm2 reload all"
 desc "Recarga todas as apps sem downtime"
 
-cmd "pm2 reload stickers-scraper-vps"
+cmd "pm2 reload stickers-parallel-scraper"
 desc "Recarga app principal sem downtime"
 
 cmd "pm2 gracefulReload all"
@@ -117,7 +126,7 @@ desc "Apenas logs de erro"
 cmd "pm2 logs --out"
 desc "Apenas logs de output"
 
-cmd "pm2 logs stickers-scraper-vps --timestamp"
+cmd "pm2 logs stickers-parallel-scraper --timestamp"
 desc "Logs com timestamp"
 
 cmd "pm2 prettylist"
@@ -135,6 +144,19 @@ desc "Instala módulo de rotação de logs"
 
 cmd "pm2 install pm2-auto-pull"
 desc "Instala auto-pull do Git"
+
+section "DASHBOARD DE MONITORAMENTO"
+cmd "pm2 start ecosystem.config.js --only stickers-dashboard"
+desc "Inicia dashboard de monitoramento"
+
+cmd "pm2 start ecosystem.config.js --only stickers-dashboard --env demo"
+desc "Inicia dashboard em modo demonstração"
+
+cmd "pm2 stop stickers-dashboard"
+desc "Para o dashboard"
+
+cmd "node dashboard.js --demo"
+desc "Executa dashboard localmente em modo demo"
 
 section "COMANDOS ÚTEIS PARA PRODUÇÃO"
 cmd "./monitor.sh deploy"

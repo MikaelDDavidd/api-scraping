@@ -3,6 +3,7 @@ const StickerlyClient = require('../services/stickerlyClient');
 const ImageProcessor = require('../services/imageProcessor');
 const SupabaseClient = require('../services/supabaseClient');
 const { info, error, warn } = require('../utils/logger');
+const dashboardManager = require('../utils/dashboardManager');
 
 /**
  * Worker otimizado para processamento rápido de stickers simples/leves
@@ -105,6 +106,13 @@ class LightProcessor extends BaseWorker {
         stickerCount: pack.resourceFiles?.length || 0,
         isAnimated: pack.isAnimated
       });
+      
+      // Notificar dashboard
+      dashboardManager.startProcessingPack('light', {
+        id: packId,
+        name: pack.name,
+        stickers: pack.resourceFiles?.length || 0
+      });
 
       // Validação inicial para light processing
       const validation = this.validateLightPack(pack);
@@ -171,6 +179,9 @@ class LightProcessor extends BaseWorker {
           avgTimePerSticker: `${Math.round(processingTime / stickerResults.validStickers.length)}ms`
         });
 
+        // Notificar dashboard sobre sucesso
+        dashboardManager.finishProcessingPack('light', packId, true);
+
         return {
           success: true,
           packId,
@@ -182,6 +193,7 @@ class LightProcessor extends BaseWorker {
       } else {
         // Erro no upload
         this.updateLightMetrics(false, processingTime, stickerResults.validStickers.length, 1);
+        dashboardManager.finishProcessingPack('light', packId, false);
         return { success: false, reason: 'upload_failed' };
       }
 
@@ -189,6 +201,7 @@ class LightProcessor extends BaseWorker {
       const processingTime = Date.now() - startTime;
       this.updateLightMetrics(false, processingTime, 0, 0);
       error(`❌ Erro no processamento do pack leve: ${packId}`, err);
+      dashboardManager.finishProcessingPack('light', packId, false);
       throw err;
     } finally {
       // Limpeza rápida
