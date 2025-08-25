@@ -5,7 +5,6 @@ node_modules/
 
 # Dados locais
 stickers_dev/
-data_captured/
 logs/
 discovered_packs.json
 processed_packs.json
@@ -18,14 +17,12 @@ discovery_state.json
 .vscode/
 .idea/
 
-# Docker files (evitar recursão)
-Dockerfile
-docker-compose*.yml
-.dockerignore
-
-# Scripts locais
+# Scripts locais que não são necessários no container
 monitor.sh
 run_*.sh
+pm2-*.sh
+dashboard-commands.sh
+deploy-*.sh
 
 # Environment (será passado via docker-compose)
 .env
@@ -34,7 +31,7 @@ run_*.sh
 .git/
 .gitignore
 
-# Documentação (opcional)
+# Documentação
 README*.md
 *.md
 
@@ -42,10 +39,11 @@ README*.md
 *.bak
 *.backup
 
-# Test files
+# Test files e diretórios temporários
 test_*
 temp/
 temp_mac/
+logs-vps/
 
 # Package files temporários
 yarn.lock
