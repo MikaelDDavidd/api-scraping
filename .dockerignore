@@ -48,5 +48,4 @@ temp/
 temp_mac/
 
 # Package files temporários
-package-lock.json
 yarn.lock
