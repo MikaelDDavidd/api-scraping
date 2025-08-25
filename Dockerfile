@@ -39,12 +39,12 @@ COPY --from=base /app/node_modules ./node_modules
 COPY . .
 
 # Criar diretórios necessários e dar permissões
-RUN mkdir -p data_captured stickers logs && \
+RUN mkdir -p stickers logs && \
     chmod +x *.sh && \
     chown -R appuser:appuser /app
 
 # Volumes para persistência
-VOLUME ["/app/stickers", "/app/data_captured", "/app/logs"]
+VOLUME ["/app/stickers", "/app/logs"]
 
 # Trocar para usuário não-root
 USER appuser
@@ -61,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 EXPOSE 3000
 
 # Script de entrada padrão
-CMD ["node", "processor_service.js"]
+CMD ["node", "index.js"]

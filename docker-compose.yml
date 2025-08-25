@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   # DISCOVERY SERVICE - 1 instância apenas
   discovery:
     build: .
     container_name: stickers-discovery
-    command: node discovery_service.js
+    command: node run_parallel_system.js
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
@@ -14,7 +12,6 @@ services:
       - stickers_data:/app/stickers
       - queue_data:/app
       - logs_data:/app/logs
-      - ./data_captured:/app/data_captured
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "test", "-f", "/app/discovered_packs.json"]
@@ -27,7 +24,7 @@ services:
   processor-1:
     build: .
     container_name: stickers-processor-1
-    command: node processor_service.js
+    command: node run_parallel_system.js
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
@@ -51,7 +48,7 @@ services:
   processor-2:
     build: .
     container_name: stickers-processor-2
-    command: node processor_service.js
+    command: node run_parallel_system.js
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
@@ -75,7 +72,7 @@ services:
   processor-3:
     build: .
     container_name: stickers-processor-3
-    command: node processor_service.js
+    command: node run_parallel_system.js
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
@@ -100,7 +97,7 @@ services:
   monitor:
     build: .
     container_name: stickers-monitor
-    command: node monitor_web.js
+    command: node index.js
     ports:
       - "3000:3000"
     environment:

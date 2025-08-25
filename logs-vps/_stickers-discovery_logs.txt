@@ -1,0 +1,100 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libvips42 is already the newest version (8.14.1-3+deb12u2).
+python3 is already the newest version (3.11.2-1+b1).
+make is already the newest version (4.3-4.1).
+g++ is already the newest version (4:12.2.0-3).
+0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+npm error code ENOENT
+npm error syscall open
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/app/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-08-25T14_09_24_893Z-debug-0.log
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libvips42 is already the newest version (8.14.1-3+deb12u2).
+python3 is already the newest version (3.11.2-1+b1).
+make is already the newest version (4.3-4.1).
+g++ is already the newest version (4:12.2.0-3).
+0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+npm error code ENOENT
+npm error syscall open
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/app/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-08-25T14_09_35_486Z-debug-0.log
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libvips42 is already the newest version (8.14.1-3+deb12u2).
+python3 is already the newest version (3.11.2-1+b1).
+make is already the newest version (4.3-4.1).
+g++ is already the newest version (4:12.2.0-3).
+0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+npm error code ENOENT
+npm error syscall open
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/app/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-08-25T14_09_44_888Z-debug-0.log
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libvips42 is already the newest version (8.14.1-3+deb12u2).
+python3 is already the newest version (3.11.2-1+b1).
+make is already the newest version (4.3-4.1).
+g++ is already the newest version (4:12.2.0-3).
+0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+npm error code ENOENT
+npm error syscall open
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/app/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-08-25T14_09_54_259Z-debug-0.log
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libvips42 is already the newest version (8.14.1-3+deb12u2).
+python3 is already the newest version (3.11.2-1+b1).
+make is already the newest version (4.3-4.1).
+g++ is already the newest version (4:12.2.0-3).
+0 upgraded, 0 newly installed, 0 to remove and 3 not upgraded.
+npm error code ENOENT
+npm error syscall open
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/app/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-08-25T14_10_05_858Z-debug-0.log
+Hit:1 http://deb.debian.org/debian bookworm InRelease
+Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+Reading package lists...
