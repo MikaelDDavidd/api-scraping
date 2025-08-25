@@ -1,0 +1,55 @@
+services:
+  # MAIN SERVICE - Tudo em um container só para VPS pequena
+  stickers-main:
+    build: .
+    container_name: stickers-main
+    command: node index.js
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - stickers_data:/app/stickers
+      - queue_data:/app
+      - logs_data:/app/logs
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+        reservations:
+          memory: 400M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  stickers_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers
+
+  queue_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers-queue
+
+  logs_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers-logs
+
+networks:
+  default:
+    name: stickers-network

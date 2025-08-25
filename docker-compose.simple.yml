@@ -1,0 +1,55 @@
+services:
+  # SINGLE SERVICE - Modo simples para VPS 1GB (RECOMENDADO)
+  stickers-scraper:
+    image: node:18-slim
+    container_name: stickers-scraper
+    working_dir: /app
+    command: >
+      bash -c "
+        apt-get update && 
+        apt-get install -y libvips42 python3 make g++ curl && 
+        npm ci && 
+        node index.js continuous
+      "
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - /home/ubuntu/api-scraping:/app
+      - stickers_data:/app/stickers
+      - logs_data:/app/logs
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+        reservations:
+          memory: 400M
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "node"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  stickers_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers
+
+  logs_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers-logs
+
+networks:
+  default:
+    name: stickers-network
