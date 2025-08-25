@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  # DISCOVERY SERVICE - 1 instância apenas
+  discovery:
+    build: .
+    container_name: stickers-discovery
+    command: node discovery_service.js
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - stickers_data:/app/stickers
+      - queue_data:/app
+      - logs_data:/app/logs
+      - ./data_captured:/app/data_captured
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "test", "-f", "/app/discovered_packs.json"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # PROCESSOR SERVICE - Múltiplas instâncias
+  processor-1:
+    build: .
+    container_name: stickers-processor-1
+    command: node processor_service.js
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - stickers_data:/app/stickers
+      - queue_data:/app
+      - logs_data:/app/logs
+    depends_on:
+      - discovery
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  processor-2:
+    build: .
+    container_name: stickers-processor-2
+    command: node processor_service.js
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - stickers_data:/app/stickers
+      - queue_data:/app
+      - logs_data:/app/logs
+    depends_on:
+      - discovery
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  processor-3:
+    build: .
+    container_name: stickers-processor-3
+    command: node processor_service.js
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - stickers_data:/app/stickers
+      - queue_data:/app
+      - logs_data:/app/logs
+    depends_on:
+      - discovery
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # MONITOR - Dashboard web opcional
+  monitor:
+    build: .
+    container_name: stickers-monitor
+    command: node monitor_web.js
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - queue_data:/app
+      - logs_data:/app/logs
+      - stickers_data:/app/stickers:ro
+    depends_on:
+      - discovery
+    restart: unless-stopped
+
+volumes:
+  # Volume principal para stickers (persistente)
+  stickers_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers
+
+  # Volume para fila e estado (compartilhado entre containers)
+  queue_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers-queue
+
+  # Volume para logs
+  logs_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/ubuntu/stickers-logs
+
+networks:
+  default:
+    name: stickers-network

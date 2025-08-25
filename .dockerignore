@@ -1,0 +1,52 @@
+# Arquivos que não precisam ir para a imagem Docker
+
+# Node modules (será instalado no container)
+node_modules/
+
+# Dados locais
+stickers_dev/
+data_captured/
+logs/
+discovered_packs.json
+processed_packs.json
+discovery_state.json
+
+# Arquivos de desenvolvimento
+*.log
+*.tmp
+.DS_Store
+.vscode/
+.idea/
+
+# Docker files (evitar recursão)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Scripts locais
+monitor.sh
+run_*.sh
+
+# Environment (será passado via docker-compose)
+.env
+
+# Git
+.git/
+.gitignore
+
+# Documentação (opcional)
+README*.md
+*.md
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+test_*
+temp/
+temp_mac/
+
+# Package files temporários
+package-lock.json
+yarn.lock

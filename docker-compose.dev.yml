@@ -1,0 +1,73 @@
+version: '3.8'
+
+# VERSÃO DEVELOPMENT - Para testes locais
+services:
+  # DISCOVERY SERVICE - 1 instância
+  discovery-dev:
+    build: .
+    container_name: stickers-discovery-dev
+    command: node discovery_service.js
+    environment:
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - ./stickers_dev:/app/stickers
+      - ./:/app/queue
+      - ./data_captured:/app/data_captured
+    restart: unless-stopped
+    profiles: ["dev"]
+
+  # PROCESSOR SERVICE - 2 instâncias para dev
+  processor-dev-1:
+    build: .
+    container_name: stickers-processor-dev-1
+    command: node processor_service.js
+    environment:
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - ./stickers_dev:/app/stickers
+      - ./:/app/queue
+    depends_on:
+      - discovery-dev
+    restart: unless-stopped
+    profiles: ["dev"]
+
+  processor-dev-2:
+    build: .
+    container_name: stickers-processor-dev-2
+    command: node processor_service.js
+    environment:
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    volumes:
+      - ./stickers_dev:/app/stickers
+      - ./:/app/queue
+    depends_on:
+      - discovery-dev
+    restart: unless-stopped
+    profiles: ["dev"]
+
+  # MONITOR para development
+  monitor-dev:
+    build: .
+    container_name: stickers-monitor-dev
+    command: node monitor_web.js
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./:/app/queue
+      - ./stickers_dev:/app/stickers:ro
+    depends_on:
+      - discovery-dev
+    restart: unless-stopped
+    profiles: ["dev"]
+
+networks:
+  default:
+    name: stickers-dev-network
