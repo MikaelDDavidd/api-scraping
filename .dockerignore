@@ -25,7 +25,6 @@ dashboard-commands.sh
 deploy-*.sh
 
 # Environment (será passado via docker-compose)
-.env
 
 # Git
 .git/
