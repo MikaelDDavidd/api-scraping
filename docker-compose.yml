@@ -3,7 +3,7 @@ services:
   stickers-scraper:
     build: .
     container_name: stickers-scraper
-    command: node parallel_scraper.js
+    command: node run_parallel_system.js
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=https://hmtohytskgvromvpuoom.supabase.co

@@ -107,7 +107,8 @@ class ParallelScrapingSystem {
 
       // 3. Discovery Worker - Descoberta e classificação
       info('\n3. Inicializando Discovery Worker...');
-      // this.components.discoveryWorker = new RealDiscoveryWorker(); // Removido - usar alternativa
+      const DiscoveryWorkerAdapter = require('./workers/discoveryWorkerAdapter');
+      this.components.discoveryWorker = new DiscoveryWorkerAdapter();
       this.components.discoveryWorker.setQueueManager(this.components.queueManager);
       this.components.discoveryWorker.setResourceMonitor(this.components.resourceMonitor);
 
