@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+  # PARALLEL SYSTEM - Versão limpa baseada na API original
   stickers-scraper:
     build: .
     container_name: stickers-scraper
@@ -17,10 +16,14 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
-    mem_limit: 1g
-    memswap_limit: 1g
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
     healthcheck:
-      test: ["CMD", "sh", "-c", "ps aux | grep -v grep | grep node"]
+      test: ["CMD", "ps", "aux", "|", "grep", "-v", "grep", "|", "grep", "node"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -28,4 +31,4 @@ services:
 
 networks:
   default:
-    driver: bridge
+    name: stickers-network
