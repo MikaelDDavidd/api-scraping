@@ -1,3 +1,174 @@
+1# 📋 Guia Completo: Deploy do Sistema de Stickers na VPS
+
+## 🎯 O que vamos fazer
+Vamos configurar seu sistema de stickers na VPS Ubuntu, migrando as figurinhas antigas e colocando tudo para funcionar com Docker.
+
+---
+
+## 📋 Pré-requisitos
+- Acesso SSH à VPS Ubuntu
+- Git instalado na VPS
+- Docker e Docker Compose instalados na VPS
+- URL do seu repositório Git
+
+---
+
+## 🚀 PASSO A PASSO COMPLETO
+
+### 1. Conectar na VPS
+
+```bash
+# SSH para sua VPS
+ssh ubuntu@vm-instance-001
+
+# Verificar se está no diretório correto
+pwd
+# Deve mostrar: /home/ubuntu
+```
+
+### 2. Verificar Dependências
+
+```bash
+# Verificar se Git está instalado
+git --version
+
+# Verificar se Docker está instalado
+docker --version
+docker-compose --version
+
+# Se algum não estiver instalado, instale:
+# sudo apt update
+# sudo apt install git docker.io docker-compose -y
+# sudo usermod -aG docker ubuntu
+# newgrp docker
+```
+
+### 3. Clonar o Projeto
+
+```bash
+# Clonar seu repositório (substitua pela URL correta)
+git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git api-scraping
+
+# Entrar no diretório do projeto
+cd api-scraping
+
+# Verificar se baixou corretamente
+ls -la
+```
+
+### 4. Criar Script de Configuração
+
+```bash
+# Criar o script que vai configurar tudo
+cat > setup_production.sh << 'EOF'
+#!/bin/bash
+
+echo "=== CONFIGURANDO PROJETO PARA PRODUÇÃO ==="
+
+# Verificar se estamos no diretório correto
+if [ ! -f "package.json" ]; then
+    echo "❌ ERRO: Execute este script dentro do diretório do projeto"
+    exit 1
+fi
+
+# 1. Corrigir .gitignore
+echo "1. Corrigindo .gitignore..."
+if [ -f .gitignore ]; then
+    cp .gitignore .gitignore.backup
+    # Remove a linha que ignora o diretório stickers
+    sed -i '/^stickers\/$/d' .gitignore
+    echo "✅ .gitignore corrigido"
+fi
+
+# 2. Configurar .env para produção
+echo "2. Configurando ambiente de produção..."
+if [ -f .env ]; then
+    cp .env .env.backup
+    sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env
+    echo "✅ NODE_ENV configurado para production"
+else
+    echo "❌ Arquivo .env não encontrado!"
+    echo "Criando .env básico..."
+    cat > .env << 'ENVEOF'
+# Configuração para produção
+SUPABASE_URL=https://hmtohytskgvromvpuoom.supabase.co
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdG9oeXRza2d2cm9tdnB1b29tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjgxNTcwNywiZXhwIjoyMDY4MzkxNzA3fQ.P1iAJiNKEOWXFv7X1VC3E4RqSCobsR9eAM87g5OqhZY
+NODE_ENV=production
+ENVEOF
+fi
+
+# 3. Criar diretórios necessários
+echo "3. Criando estrutura de diretórios..."
+mkdir -p stickers
+mkdir -p logs
+mkdir -p temp
+chmod 755 stickers logs temp
+echo "✅ Diretórios criados"
+
+# 4. Verificar .dockerignore
+echo "4. Verificando .dockerignore..."
+if [ ! -f .dockerignore ]; then
+    echo "Criando .dockerignore..."
+    cat > .dockerignore << 'DOCKEREOF'
+node_modules/
+*.log
+.DS_Store
+.git/
+.gitignore
+README*.md
+*.md
+*.bak
+*.backup
+test_*
+temp/
+.vscode/
+.idea/
+DOCKEREOF
+fi
+
+# Garantir que .env não está no .dockerignore (precisa no container)
+sed -i '/^\.env$/d' .dockerignore
+echo "✅ .dockerignore configurado"
+
+# 5. Mostrar status
+echo ""
+echo "=== STATUS DA CONFIGURAÇÃO ==="
+echo "📁 Diretório atual: $(pwd)"
+echo "📄 Arquivo .env:"
+if [ -f .env ]; then
+    echo "   ✅ Existe"
+    echo "   NODE_ENV: $(grep NODE_ENV .env)"
+else
+    echo "   ❌ Não existe"
+fi
+echo "📁 Diretórios:"
+echo "   stickers/: $([ -d stickers ] && echo '✅' || echo '❌')"
+echo "   logs/: $([ -d logs ] && echo '✅' || echo '❌')"
+
+echo ""
+echo "✅ CONFIGURAÇÃO CONCLUÍDA!"
+echo ""
+echo "Próximos passos:"
+echo "1. Execute: ./migrate_stickers.sh"
+echo "2. Execute: docker-compose up -d"
+EOF
+
+# Dar permissão de execução
+chmod +x setup_production.sh
+```
+
+### 5. Executar Configuração
+
+```bash
+# Executar o script de configuração
+./setup_production.sh
+```
+
+### 6. Criar Script de Migração das Figurinhas
+
+```bash
+# Criar o script de migração
+cat > migrate_stickers.sh << 'EOF'
 #!/bin/bash
 
 # Configurações
@@ -256,3 +427,134 @@ echo ""
 echo "Próximos passos:"
 echo "1. Verificar: ls -la stickers/ | head -10"
 echo "2. Executar: docker-compose up -d"
+EOF
+
+# Dar permissão de execução
+chmod +x migrate_stickers.sh
+```
+
+### 7. Executar Migração das Figurinhas
+
+```bash
+# Executar a migração
+./migrate_stickers.sh
+
+# Escolha a opção 3 primeiro para fazer uma análise
+# Depois execute novamente e escolha opção 1 ou 2
+```
+
+### 8. Verificar se a Migração Funcionou
+
+```bash
+# Verificar quantas figurinhas foram migradas
+echo "Figurinhas originais: $(ls -1 /home/ubuntu/stickers 2>/dev/null | wc -l)"
+echo "Figurinhas migradas: $(ls -1 stickers/ 2>/dev/null | wc -l)"
+
+# Ver alguns exemplos
+ls -la stickers/ | head -10
+```
+
+### 9. Configurar e Subir o Docker
+
+```bash
+# Verificar se o docker-compose.yml existe
+ls -la docker-compose.yml
+
+# Ver o conteúdo (verificar se está configurado corretamente)
+cat docker-compose.yml
+
+# Subir o ambiente Docker
+docker-compose up -d
+
+# Verificar se os containers subiram
+docker ps
+
+# Ver logs se necessário
+docker-compose logs
+```
+
+### 10. Verificar se Está Funcionando
+
+```bash
+# Verificar se o sistema está rodando
+docker ps
+
+# Testar se as figurinhas estão acessíveis no container
+docker exec -it $(docker ps --format "table {{.Names}}" | grep -v NAMES | head -1) ls /app/stickers | head -10
+
+# Verificar logs do aplicativo
+docker-compose logs -f --tail=50
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Se der erro "diretório não encontrado":
+```bash
+# Verificar onde estão as figurinhas antigas
+find /home -name "stickers" -type d 2>/dev/null
+ls -la /home/ubuntu/
+ls -la /home/
+```
+
+### Se o Docker não subir:
+```bash
+# Verificar erros
+docker-compose logs
+
+# Verificar se as portas estão livres
+sudo netstat -tulpn | grep :3000
+
+# Recriar containers
+docker-compose down
+docker-compose up -d --build
+```
+
+### Se o .env não estiver correto:
+```bash
+# Verificar conteúdo
+cat .env
+
+# Corrigir manualmente se necessário
+nano .env
+```
+
+---
+
+## 🎉 Resultado Final
+
+Após seguir todos os passos, você terá:
+
+1. ✅ Projeto clonado em `/home/ubuntu/api-scraping/`
+2. ✅ Figurinhas migradas de `/home/ubuntu/stickers/` para `/home/ubuntu/api-scraping/stickers/`
+3. ✅ Sistema rodando com Docker
+4. ✅ Backup preservado no diretório original
+5. ✅ Configuração de produção aplicada
+
+O sistema estará disponível e funcionando, com todas as suas figurinhas acessíveis pelo novo sistema Docker/Git!
+
+---
+
+## 📞 Comandos Úteis para Manutenção
+
+```bash
+# Ver status dos containers
+docker ps
+
+# Ver logs
+docker-compose logs -f
+
+# Reiniciar sistema
+docker-compose restart
+
+# Parar sistema
+docker-compose down
+
+# Atualizar código
+git pull
+docker-compose up -d --build
+
+# Backup das figurinhas
+tar -czf backup_stickers_$(date +%Y%m%d).tar.gz stickers/
+```
