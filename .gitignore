@@ -24,6 +24,10 @@ temp/
 data_captured/
 data_captured/*.json
 
+# Stickers directory (local development and production)
+stickers/
+queue_data/
+
 # OS generated files
 .DS_Store
 .DS_Store?

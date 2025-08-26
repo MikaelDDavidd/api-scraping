@@ -15,7 +15,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar dependências
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Stage final
 FROM node:18-slim AS final
@@ -23,6 +23,7 @@ FROM node:18-slim AS final
 # Instalar runtime dependencies
 RUN apt-get update && apt-get install -y \
     libvips \
+    webp \
     jq \
     curl \
     && rm -rf /var/lib/apt/lists/*

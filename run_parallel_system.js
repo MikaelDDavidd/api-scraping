@@ -4,7 +4,7 @@ const QueueManager = require('./workers/queueManager');
 const ResourceMonitor = require('./workers/resourceMonitor');
 const LightProcessor = require('./workers/lightProcessor');
 const HeavyProcessor = require('./workers/heavyProcessor');
-const { RealDiscoveryWorker } = require('./test_real_integration');
+// const { RealDiscoveryWorker } = require('./test_real_integration'); // Removido - arquivo não existe
 const { info, error, warn } = require('./utils/logger');
 const TableLogger = require('./utils/tableLogger');
 const SupabaseClient = require('./services/supabaseClient');
@@ -107,7 +107,7 @@ class ParallelScrapingSystem {
 
       // 3. Discovery Worker - Descoberta e classificação
       info('\n3. Inicializando Discovery Worker...');
-      this.components.discoveryWorker = new RealDiscoveryWorker();
+      // this.components.discoveryWorker = new RealDiscoveryWorker(); // Removido - usar alternativa
       this.components.discoveryWorker.setQueueManager(this.components.queueManager);
       this.components.discoveryWorker.setResourceMonitor(this.components.resourceMonitor);
 

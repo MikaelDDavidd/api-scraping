@@ -1,167 +1,87 @@
+/**
+ * PACK CACHE SERVICE
+ * Sistema inteligente de cache para evitar milhares de queries ao banco
+ * 
+ * Mantém duas listas em memória:
+ * 1. existingPacks - Packs já no banco (carregada na inicialização)
+ * 2. processingPacks - Packs sendo processados (evita duplicatas na fila)
+ */
+
 const { info, warn, error } = require('../utils/logger');
 
-/**
- * Cache de packs existentes para evitar reprocessamento
- * Mantém em memória os IDs de todos os packs já processados
- */
 class PackCache {
   constructor(supabaseClient) {
     this.supabaseClient = supabaseClient;
+    
+    // Lista de packs que já existem no banco
     this.existingPacks = new Set();
-    this.isLoaded = false;
-    this.lastUpdate = null;
-    this.loadingPromise = null;
     
-    // Configurações
-    this.maxCacheSize = 50000; // Máximo de 50k pack IDs em cache
-    this.refreshInterval = 300000; // 5 minutos
-    this.autoRefreshTimer = null;
+    // Lista de packs que estão sendo processados (na fila)
+    this.processingPacks = new Set();
+    
+    this.isInitialized = false;
+    this.lastUpdate = 0;
+    this.updateInterval = 300000; // 5 minutos para recarregar cache
   }
 
   /**
-   * Carrega cache de packs existentes do Supabase
+   * Inicializa o cache carregando todos os identifiers do banco
    */
-  async loadExistingPacks(forceReload = false) {
-    // Se já está carregando, aguardar o processo atual
-    if (this.loadingPromise && !forceReload) {
-      return await this.loadingPromise;
-    }
-
-    // Se já carregou recentemente e não é força, pular
-    if (this.isLoaded && !forceReload && this.lastUpdate && 
-        (Date.now() - this.lastUpdate) < this.refreshInterval) {
-      return this.existingPacks.size;
-    }
-
-    // Criar promessa de loading
-    this.loadingPromise = this._performLoad();
-    const result = await this.loadingPromise;
-    this.loadingPromise = null;
-    
-    return result;
-  }
-
-  /**
-   * Executa o carregamento real do cache
-   */
-  async _performLoad() {
-    const startTime = Date.now();
+  async initialize() {
+    info('🔄 Inicializando cache de packs...');
     
     try {
-      info('📚 Carregando cache de packs existentes do Supabase...');
-      
-      // 🚀 PAGINAÇÃO para buscar TODOS os packs (contornar limite padrão de 1000)
+      // Carregar TODOS os identifiers do banco - sem limite de paginação
       let allPacks = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-      let totalFetched = 0;
-
-      info('🔄 Iniciando carregamento paginado de packs...');
-
-      while (hasMore) {
-        const rangeStart = page * pageSize;
-        const rangeEnd = (page + 1) * pageSize - 1;
-        
-        info(`📄 Carregando página ${page + 1} (packs ${rangeStart + 1}-${rangeEnd + 1})...`);
-        
-        const { data: packs, error: fetchError } = await this.supabaseClient.supabase
+      let from = 0;
+      const batchSize = 1000;
+      
+      while (true) {
+        const { data: batch, error } = await this.supabaseClient.supabase
           .from('packs')
           .select('identifier')
-          .order('created_at', { ascending: false })
-          .range(rangeStart, rangeEnd);
-        
-        if (fetchError) {
-          throw fetchError;
-        }
-        
-        if (packs && packs.length > 0) {
-          allPacks.push(...packs);
-          totalFetched += packs.length;
-          info(`   ✅ Página ${page + 1}: ${packs.length} packs carregados (total: ${totalFetched})`);
+          .range(from, from + batchSize - 1);
           
-          // Se retornou menos que pageSize, chegou ao fim
-          if (packs.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-          }
-        } else {
-          hasMore = false;
-        }
+        if (error) throw error;
         
-        // Limite de segurança para não sobrecarregar
-        if (totalFetched >= this.maxCacheSize) {
-          warn(`🛑 Limite de segurança atingido: ${this.maxCacheSize} packs`);
-          break;
-        }
+        if (!batch || batch.length === 0) break;
+        
+        allPacks = allPacks.concat(batch);
+        from += batchSize;
+        
+        info(`📥 Carregados ${allPacks.length} packs no cache...`);
+        
+        if (batch.length < batchSize) break; // Última página
       }
       
-      info(`📊 Carregamento paginado concluído: ${totalFetched} packs encontrados`);
-      
-      // Limpar cache atual
+      // Adicionar todos ao Set para busca O(1)
       this.existingPacks.clear();
-      
-      // Adicionar ao cache
-      let addedCount = 0;
-      for (const pack of allPacks) {
-        if (pack.identifier) {
-          this.existingPacks.add(pack.identifier);
-          addedCount++;
-        }
+      for (const pack of allPacks || []) {
+        this.existingPacks.add(pack.identifier);
       }
       
-      this.isLoaded = true;
+      this.isInitialized = true;
       this.lastUpdate = Date.now();
       
-      const duration = Date.now() - startTime;
-      info(`✅ Cache carregado: ${addedCount} packs em ${duration}ms`, {
-        totalInDB: totalFetched,
-        cached: addedCount,
-        pages: page + 1,
-        duration
-      });
-      
-      // Configurar auto-refresh se não estiver configurado
-      this.startAutoRefresh();
-      
-      return addedCount;
+      info(`✅ Cache inicializado com ${this.existingPacks.size} packs existentes`);
       
     } catch (err) {
-      error('❌ Erro ao carregar cache de packs', err);
-      
-      // Se falhou, manter cache vazio mas marcar como carregado 
-      // para não bloquear o sistema
-      this.isLoaded = true;
-      this.lastUpdate = Date.now();
-      
+      error('❌ Erro ao inicializar cache:', err.message);
       throw err;
     }
   }
 
   /**
-   * Verifica se um pack já existe
+   * Verifica se um pack é novo (não existe e não está sendo processado)
    */
-  exists(packId) {
-    if (!this.isLoaded) {
-      warn('⚠️ Cache não foi carregado ainda, assumindo pack não existe');
+  isNewPack(identifier) {
+    // Verificar se já existe no banco
+    if (this.existingPacks.has(identifier)) {
       return false;
     }
     
-    return this.existingPacks.has(packId);
-  }
-
-  /**
-   * Adiciona pack ao cache (quando processado com sucesso)
-   */
-  addPack(packId) {
-    if (!packId) return;
-    
-    this.existingPacks.add(packId);
-    
-    // Verificar limite de memória
-    if (this.existingPacks.size > this.maxCacheSize) {
-      warn(`Cache excedeu limite de ${this.maxCacheSize}, não adicionando novos packs`);
+    // Verificar se já está sendo processado
+    if (this.processingPacks.has(identifier)) {
       return false;
     }
     
@@ -169,108 +89,95 @@ class PackCache {
   }
 
   /**
-   * Filtra lista de packs removendo os que já existem
+   * Filtra apenas packs novos de uma lista
    */
   filterNewPacks(packs) {
-    if (!this.isLoaded) {
-      warn('⚠️ Cache não carregado, retornando todos os packs');
-      return packs;
-    }
+    const newPacks = [];
     
-    const newPacks = packs.filter(pack => !this.exists(pack.packId));
-    
-    if (newPacks.length !== packs.length) {
-      info(`🔍 Filtrados ${packs.length - newPacks.length} packs duplicados`, {
-        original: packs.length,
-        new: newPacks.length,
-        duplicates: packs.length - newPacks.length
-      });
+    for (const pack of packs) {
+      if (this.isNewPack(pack.identifier)) {
+        newPacks.push(pack);
+        // Adicionar à lista de processamento para evitar duplicatas
+        this.processingPacks.add(pack.identifier);
+      }
     }
     
     return newPacks;
   }
 
   /**
-   * Retorna estatísticas do cache
+   * Move pack da lista de processamento para existentes (sucesso)
+   */
+  markPackAsAdded(identifier) {
+    this.processingPacks.delete(identifier);
+    this.existingPacks.add(identifier);
+    info(`✅ Pack ${identifier} adicionado ao cache de existentes`);
+  }
+
+  /**
+   * Remove pack da lista de processamento (falhou)
+   */
+  markPackAsFailed(identifier) {
+    this.processingPacks.delete(identifier);
+    warn(`⚠️  Pack ${identifier} removido da fila de processamento (falhou)`);
+  }
+
+  /**
+   * Atualiza o cache periodicamente (evita ficar muito desatualizado)
+   */
+  async updateCacheIfNeeded() {
+    const now = Date.now();
+    
+    if (now - this.lastUpdate > this.updateInterval) {
+      info('🔄 Atualizando cache de packs...');
+      
+      try {
+        // Buscar apenas packs adicionados recentemente
+        const lastUpdateDate = new Date(this.lastUpdate).toISOString();
+        
+        const { data: newPacks, error } = await this.supabaseClient.supabase
+          .from('packs')
+          .select('identifier')
+          .gte('created_at', lastUpdateDate);
+          
+        if (!error && newPacks) {
+          for (const pack of newPacks) {
+            this.existingPacks.add(pack.identifier);
+          }
+          
+          info(`🔄 Cache atualizado com ${newPacks.length} novos packs`);
+        }
+        
+        this.lastUpdate = now;
+        
+      } catch (err) {
+        warn('⚠️  Erro ao atualizar cache:', err.message);
+      }
+    }
+  }
+
+  /**
+   * Estatísticas do cache
    */
   getStats() {
     return {
-      isLoaded: this.isLoaded,
-      size: this.existingPacks.size,
-      maxSize: this.maxCacheSize,
-      lastUpdate: this.lastUpdate,
-      lastUpdateAge: this.lastUpdate ? Date.now() - this.lastUpdate : null,
-      autoRefreshEnabled: !!this.autoRefreshTimer
+      existingPacks: this.existingPacks.size,
+      processingPacks: this.processingPacks.size,
+      totalCached: this.existingPacks.size + this.processingPacks.size,
+      isInitialized: this.isInitialized,
+      lastUpdate: new Date(this.lastUpdate).toISOString(),
+      cacheAge: Math.floor((Date.now() - this.lastUpdate) / 1000)
     };
   }
 
   /**
-   * Inicia atualização automática do cache
-   */
-  startAutoRefresh() {
-    // Limpar timer existente
-    if (this.autoRefreshTimer) {
-      clearInterval(this.autoRefreshTimer);
-    }
-    
-    // Configurar novo timer
-    this.autoRefreshTimer = setInterval(async () => {
-      try {
-        info('🔄 Auto-refresh do cache de packs...');
-        await this.loadExistingPacks(true);
-      } catch (err) {
-        error('Erro no auto-refresh do cache', err);
-      }
-    }, this.refreshInterval);
-    
-    info(`⏰ Auto-refresh configurado para cada ${this.refreshInterval/1000/60} minutos`);
-  }
-
-  /**
-   * Para atualização automática
-   */
-  stopAutoRefresh() {
-    if (this.autoRefreshTimer) {
-      clearInterval(this.autoRefreshTimer);
-      this.autoRefreshTimer = null;
-      info('⏹️ Auto-refresh do cache parado');
-    }
-  }
-
-  /**
-   * Força refresh do cache
-   */
-  async refresh() {
-    return await this.loadExistingPacks(true);
-  }
-
-  /**
-   * Limpa o cache
+   * Limpar cache (para testes)
    */
   clear() {
     this.existingPacks.clear();
-    this.isLoaded = false;
-    this.lastUpdate = null;
-    info('🗑️ Cache de packs limpo');
-  }
-
-  /**
-   * Retorna amostra do cache para debug
-   */
-  getSample(count = 10) {
-    const sample = Array.from(this.existingPacks).slice(0, count);
-    return {
-      total: this.existingPacks.size,
-      sample: sample
-    };
-  }
-
-  /**
-   * Cleanup ao destruir instância
-   */
-  destroy() {
-    this.stopAutoRefresh();
-    this.clear();
+    this.processingPacks.clear();
+    this.isInitialized = false;
+    this.lastUpdate = 0;
   }
 }
 
