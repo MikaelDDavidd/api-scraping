@@ -46,7 +46,7 @@ class StickerlyClient {
   }
 
   /**
-   * Executa request com retry automático e tratamento melhorado de erros
+   * Executa request com retry automático
    */
   async makeRequest(requestConfig, retries = config.scraping.maxRetries) {
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -54,37 +54,17 @@ class StickerlyClient {
         const response = await axios(requestConfig);
         return response.data;
       } catch (err) {
-        const isLastAttempt = attempt >= retries;
-        const isTimeoutError = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
-        const isNetworkError = err.code === 'ECONNRESET' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT';
-        const isServerError = err.response?.status >= 500;
-        const isCloudflareError = err.response?.status === 521 || err.response?.status === 522;
-        
-        error(`Erro na tentativa ${attempt}/${retries}`, {
-          error: err.message,
-          code: err.code,
-          status: err.response?.status,
+        error(`Erro na tentativa ${attempt}/${retries}`, err, { 
           url: requestConfig.url,
-          method: requestConfig.method,
-          isTimeout: isTimeoutError,
-          isNetwork: isNetworkError,
-          isServer: isServerError,
-          isCloudflare: isCloudflareError
+          method: requestConfig.method 
         });
         
-        if (isLastAttempt) {
+        if (attempt === retries) {
           throw err;
         }
         
-        // Delay mais longo para erros de servidor/rede
-        let delayMs = 1000 * attempt; // Base delay
-        
-        if (isTimeoutError || isNetworkError || isServerError || isCloudflareError) {
-          delayMs = Math.min(30000, 5000 * attempt); // Até 30s para erros graves
-          warn(`Erro de conectividade detectado, aguardando ${delayMs/1000}s antes de tentar novamente...`);
-        }
-        
-        await this.delay(delayMs);
+        // Delay exponencial entre tentativas
+        await this.delay(1000 * attempt);
       }
     }
   }
@@ -111,7 +91,7 @@ class StickerlyClient {
         'x-duid': this.getNextDeviceId(), // Rotacionar device ID
         'User-Agent': this.getUserAgent(locale)
       },
-      timeout: 60000 // Aumentado para 60s
+      timeout: 30000
     };
 
     try {
@@ -156,7 +136,7 @@ class StickerlyClient {
         keyword: keyword,
         cursor: cursor
       },
-      timeout: 60000 // Aumentado para 60s
+      timeout: 30000
     };
 
     try {
@@ -359,94 +339,6 @@ class StickerlyClient {
   }
 
   /**
-   * Extrai informações melhoradas do pack incluindo author name
-   */
-  enhancePackData(pack) {
-    // Tentar extrair authorName de várias fontes possíveis
-    let authorName = null;
-    
-    // 1. Campo direto authorName
-    if (pack.authorName && pack.authorName.trim()) {
-      authorName = pack.authorName.trim();
-    }
-    // 2. Campo author
-    else if (pack.author && pack.author.trim()) {
-      authorName = pack.author.trim();
-    }
-    // 3. Campo publisher
-    else if (pack.publisher && pack.publisher.trim()) {
-      authorName = pack.publisher.trim();
-    }
-    // 4. Campo creator
-    else if (pack.creator && pack.creator.trim()) {
-      authorName = pack.creator.trim();
-    }
-    // 5. Extrair do título se formato "Nome - Título"
-    else if (pack.name && pack.name.includes(' - ')) {
-      const parts = pack.name.split(' - ');
-      if (parts.length >= 2 && parts[0].trim().length > 0) {
-        authorName = parts[0].trim();
-      }
-    }
-    // 6. Verificar se há user object
-    else if (pack.user && pack.user.name) {
-      authorName = pack.user.name.trim();
-    }
-    // 7. Verificar se há owner object
-    else if (pack.owner && pack.owner.name) {
-      authorName = pack.owner.name.trim();
-    }
-    
-    // Se ainda não encontrou, tentar pattern comum
-    if (!authorName && pack.name) {
-      // Padrões como "by Author", "de Author", etc.
-      const byMatch = pack.name.match(/(?:by|de|por)\s+([^-()]+)/i);
-      if (byMatch) {
-        authorName = byMatch[1].trim();
-      }
-    }
-    
-    // Fallback final
-    if (!authorName || authorName === '') {
-      authorName = 'Autor Desconhecido';
-    }
-    
-    // Limpar e validar authorName
-    authorName = authorName
-      .replace(/[^\w\s\-_.]/g, '') // Remove caracteres especiais
-      .trim()
-      .slice(0, 50); // Limita a 50 chars
-    
-    if (authorName === '') {
-      authorName = 'Autor Desconhecido';
-    }
-    
-    // Retornar pack com dados melhorados
-    return {
-      ...pack,
-      authorName: authorName,
-      // Melhorar outros campos também
-      viewCount: pack.viewCount || pack.views || pack.downloadCount || 0,
-      isAnimated: pack.isAnimated || pack.animated || this.detectAnimatedFromFiles(pack.resourceFiles),
-      // Limpar nome do pack
-      name: pack.name ? pack.name.trim().slice(0, 100) : 'Pack sem nome'
-    };
-  }
-
-  /**
-   * Detecta se pack é animado baseado nos arquivos
-   */
-  detectAnimatedFromFiles(resourceFiles) {
-    if (!Array.isArray(resourceFiles)) return false;
-    
-    // Verificar extensões que indicam animação
-    const animatedExtensions = ['.gif', '.webp'];
-    return resourceFiles.some(file => 
-      animatedExtensions.some(ext => file.toLowerCase().includes(ext))
-    );
-  }
-
-  /**
    * Processa lista de packs e filtra os válidos
    */
   filterValidPacks(packs) {
@@ -455,18 +347,12 @@ class StickerlyClient {
       return [];
     }
 
-    // Primeiro melhorar dados de cada pack
-    const enhancedPacks = packs.map(pack => this.enhancePackData(pack));
-    
-    // Depois validar
-    const validPacks = enhancedPacks.filter(pack => this.validatePack(pack));
+    const validPacks = packs.filter(pack => this.validatePack(pack));
     
     info(`Filtração de packs concluída`, {
       total: packs.length,
-      enhanced: enhancedPacks.length,
       valid: validPacks.length,
-      invalid: packs.length - validPacks.length,
-      authorsFound: validPacks.filter(p => p.authorName !== 'Autor Desconhecido').length
+      invalid: packs.length - validPacks.length
     });
 
     return validPacks;

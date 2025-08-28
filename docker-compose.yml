@@ -1,34 +1,96 @@
+version: '3.8'
+
 services:
-  # PARALLEL SYSTEM - Versão limpa baseada na API original
   stickers-scraper:
     build: .
     container_name: stickers-scraper
-    command: node run_parallel_system.js
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
-      - SUPABASE_URL=https://hmtohytskgvromvpuoom.supabase.co
-      - SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdG9oeXRza2d2cm9tdnB1b29tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjgxNTcwNywiZXhwIjoyMDY4MzkxNzA3fQ.P1iAJiNKEOWXFv7X1VC3E4RqSCobsR9eAM87g5OqhZY
-      - SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtdG9oeXRza2d2cm9tdnB1b29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4MTU3MDcsImV4cCI6MjA2ODM5MTcwN30.iYqnCowCWgxhNJMn9a_xkjMZE7_NFKXHE4F8uKkG3gc
+      - TZ=America/Recife
     volumes:
-      - ./stickers:/app/stickers
-      - ./queue_data:/app/queue_data
+      # Persistent data volumes
       - ./logs:/app/logs
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
+      - ./data_captured:/app/data_captured
+      - scraper_temp:/app/temp
+      # Config file (read-only)
+      - ./.env:/app/.env:ro
+    networks:
+      - scraper_network
     deploy:
       resources:
         limits:
           memory: 1G
+          cpus: '1.0'
         reservations:
           memory: 512M
+          cpus: '0.5'
     healthcheck:
-      test: ["CMD", "ps", "aux", "|", "grep", "-v", "grep", "|", "grep", "node"]
+      test: ["CMD", "node", "-e", "process.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Optional: Add scraper for testing
+  stickers-scraper-test:
+    build: .
+    container_name: stickers-scraper-test
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - TZ=America/Recife
+    command: ["node", "index.js", "test"]
+    volumes:
+      - ./logs:/app/logs
+      - ./data_captured:/app/data_captured
+      - scraper_temp:/app/temp
+      - ./.env:/app/.env:ro
+    networks:
+      - scraper_network
+    profiles:
+      - test
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # Optional: Stats generator
+  stickers-scraper-stats:
+    build: .
+    container_name: stickers-scraper-stats
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - TZ=America/Recife
+    command: ["node", "index.js", "stats"]
+    volumes:
+      - ./logs:/app/logs:ro
+      - ./.env:/app/.env:ro
+    networks:
+      - scraper_network
+    profiles:
+      - stats
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
 
 networks:
-  default:
-    name: stickers-network
+  scraper_network:
+    driver: bridge
+
+volumes:
+  scraper_temp:
+    driver: local

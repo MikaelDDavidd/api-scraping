@@ -1,65 +1,66 @@
-# Multi-stage build para otimizar tamanho da imagem
-FROM node:18-slim AS base
+# Build stage
+FROM node:18-alpine AS builder
 
-# Instalar dependências do sistema para Sharp
-RUN apt-get update && apt-get install -y \
-    libvips-dev \
+# Install build dependencies for Sharp
+RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    && rm -rf /var/lib/apt/lists/*
+    gcc \
+    libc-dev \
+    vips-dev \
+    fftw-dev \
+    build-base
 
 WORKDIR /app
 
-# Copiar package files
+# Copy package files
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm install --only=production
+# Install all dependencies including dev
+RUN npm ci
 
-# Stage final
-FROM node:18-slim AS final
+# Copy application code
+COPY . .
 
-# Instalar runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libvips \
-    webp \
-    jq \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Production stage
+FROM node:18-alpine
 
-# Criar usuário não-root
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Install runtime dependencies for Sharp and image processing
+RUN apk add --no-cache \
+    vips \
+    vips-tools \
+    fftw \
+    libjpeg-turbo \
+    libpng \
+    libwebp \
+    giflib \
+    librsvg \
+    tini
 
 WORKDIR /app
 
-# Copiar node_modules do stage base
-COPY --from=base /app/node_modules ./node_modules
+# Copy package files
+COPY package*.json ./
 
-# Copiar código da aplicação
-COPY . .
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-# Criar diretórios necessários e dar permissões
-RUN mkdir -p stickers logs && \
-    chmod +x *.sh && \
-    chown -R appuser:appuser /app
+# Copy application code
+COPY --from=builder /app .
 
-# Volumes para persistência
-VOLUME ["/app/stickers", "/app/logs"]
+# Create necessary directories
+RUN mkdir -p logs temp data_captured
 
-# Trocar para usuário não-root
-USER appuser
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
-# Variáveis de ambiente padrão
-ENV NODE_ENV=production
-ENV LOG_LEVEL=info
+USER nodejs
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
 
-# Expor porta para healthcheck (se necessário)
-EXPOSE 3000
-
-# Script de entrada padrão
+# Default command
 CMD ["node", "index.js"]

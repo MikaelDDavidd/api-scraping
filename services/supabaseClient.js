@@ -2,7 +2,6 @@ const { createClient } = require('@supabase/supabase-js');
 const { config } = require('../config/config');
 const { info, error, warn, uploadSuccess, uploadError } = require('../utils/logger');
 const LocalStorageClient = require('./localStorageClient');
-const TableLogger = require('../utils/tableLogger');
 
 class SupabaseClient {
   constructor() {
@@ -23,13 +22,6 @@ class SupabaseClient {
     // Decidir se usar storage local ou Supabase
     this.useLocalStorage = process.env.USE_LOCAL_STORAGE === 'true' || process.env.USE_LOCAL_STORAGE === '1';
     
-    // Controle de reconexão automática
-    this.connectionRetries = 0;
-    this.maxConnectionRetries = 5;
-    this.lastHealthCheck = 0;
-    this.healthCheckInterval = 60000; // 1 minuto
-    this.isHealthy = true;
-    
     if (this.useLocalStorage) {
       this.localStorageClient = new LocalStorageClient();
       info('Usando storage local para arquivos', { 
@@ -42,99 +34,10 @@ class SupabaseClient {
   }
 
   /**
-   * Verifica saúde da conexão com Supabase
-   */
-  async checkHealth() {
-    const now = Date.now();
-    
-    // Se checou recentemente e estava saudável, pular
-    if (this.isHealthy && (now - this.lastHealthCheck) < this.healthCheckInterval) {
-      return this.isHealthy;
-    }
-    
-    try {
-      // Fazer query simples para testar conectividade
-      const { error } = await this.supabase
-        .from('packs')
-        .select('id')
-        .limit(1);
-      
-      if (error) {
-        throw error;
-      }
-      
-      this.isHealthy = true;
-      this.connectionRetries = 0;
-      this.lastHealthCheck = now;
-      
-      if (!this.isHealthy) {
-        info('🟢 Conexão com Supabase restaurada');
-      }
-      
-      return true;
-    } catch (err) {
-      this.isHealthy = false;
-      this.lastHealthCheck = now;
-      
-      warn('🔴 Problema de conectividade com Supabase', {
-        error: err.message,
-        code: err.code,
-        retries: this.connectionRetries
-      });
-      
-      return false;
-    }
-  }
-
-  /**
-   * Executa operação com retry automático e health check
-   */
-  async withRetry(operation, operationName = 'operação') {
-    for (let attempt = 1; attempt <= this.maxConnectionRetries; attempt++) {
-      try {
-        // Verificar saúde da conexão antes de tentar
-        if (!await this.checkHealth()) {
-          throw new Error('Supabase não está disponível');
-        }
-        
-        return await operation();
-      } catch (err) {
-        const isLastAttempt = attempt >= this.maxConnectionRetries;
-        const isConnectionError = err.message?.includes('521') || 
-                                  err.message?.includes('522') ||
-                                  err.message?.includes('network') ||
-                                  err.code === 'PGRST301';
-        
-        error(`Erro na tentativa ${attempt}/${this.maxConnectionRetries} - ${operationName}`, {
-          error: err.message,
-          code: err.code,
-          isConnection: isConnectionError
-        });
-        
-        if (isLastAttempt) {
-          // Se esgotou tentativas, marcar como não saudável
-          this.isHealthy = false;
-          throw err;
-        }
-        
-        if (isConnectionError) {
-          this.connectionRetries++;
-          const delayMs = Math.min(60000, 10000 * attempt); // Até 60s
-          warn(`Aguardando ${delayMs/1000}s antes de tentar ${operationName} novamente...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        } else {
-          // Para outros erros, delay menor
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-        }
-      }
-    }
-  }
-
-  /**
    * Verifica se pack já existe no banco
    */
   async packExists(identifier) {
-    return await this.withRetry(async () => {
+    try {
       const { data, error: queryError } = await this.supabase
         .from('packs')
         .select('id, identifier')
@@ -146,7 +49,10 @@ class SupabaseClient {
       }
 
       return data ? data.id : null;
-    }, 'verificar pack existente');
+    } catch (err) {
+      error('Erro ao verificar se pack existe', err, { identifier });
+      return null;
+    }
   }
 
   /**
@@ -176,19 +82,6 @@ class SupabaseClient {
     try {
       info(`Criando pack: ${packData.name}`, { identifier: packData.identifier });
 
-      // Verificar se pack já existe
-      const { data: existingPack, error: checkError } = await this.supabase
-        .from('packs')
-        .select('id, identifier')
-        .eq('identifier', packData.identifier)
-        .single();
-
-      if (existingPack) {
-        info(`Pack já existe: ${packData.identifier}`, { id: existingPack.id });
-        return existingPack.id;
-      }
-
-      // Se não existir, criar novo
       const { data, error: insertError } = await this.supabase
         .from('packs')
         .insert({
@@ -221,70 +114,6 @@ class SupabaseClient {
     } catch (err) {
       error('Erro ao criar pack', err, { packData });
       throw err;
-    }
-  }
-
-  /**
-   * Consulta estatísticas do banco de dados
-   */
-  async getStats() {
-    try {
-      // Contar packs total
-      const { count: totalPacks, error: packsError } = await this.supabase
-        .from('packs')
-        .select('*', { count: 'exact', head: true });
-
-      if (packsError) throw packsError;
-
-      // Contar stickers total
-      const { count: totalStickers, error: stickersError } = await this.supabase
-        .from('stickers')
-        .select('*', { count: 'exact', head: true });
-
-      if (stickersError) throw stickersError;
-
-      // Packs por idioma
-      const { data: packsByLang, error: langError } = await this.supabase
-        .from('packs')
-        .select('lang')
-        .neq('lang', null);
-
-      if (langError) throw langError;
-
-      // Processar contagem por idioma
-      const langCounts = {};
-      packsByLang.forEach(pack => {
-        const lang = pack.lang || 'unknown';
-        langCounts[lang] = (langCounts[lang] || 0) + 1;
-      });
-
-      // Packs animados vs estáticos
-      const { count: animatedPacks, error: animatedError } = await this.supabase
-        .from('packs')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_animated', true);
-
-      if (animatedError) throw animatedError;
-
-      return {
-        totalPacks: totalPacks || 0,
-        totalStickers: totalStickers || 0,
-        animatedPacks: animatedPacks || 0,
-        staticPacks: (totalPacks || 0) - (animatedPacks || 0),
-        packsByLanguage: langCounts,
-        avgStickersPerPack: totalPacks > 0 ? Math.round((totalStickers || 0) / totalPacks) : 0
-      };
-
-    } catch (err) {
-      error('Erro ao consultar estatísticas do banco', err);
-      return {
-        totalPacks: 0,
-        totalStickers: 0,
-        animatedPacks: 0,
-        staticPacks: 0,
-        packsByLanguage: {},
-        avgStickersPerPack: 0
-      };
     }
   }
 
@@ -476,14 +305,6 @@ class SupabaseClient {
         totalStickers: stickersToSave.length,
         storageType: this.useLocalStorage ? 'local' : 'supabase'
       });
-
-      // Log detalhado com estatísticas atualizadas do banco
-      try {
-        const updatedStats = await this.getStats();
-        TableLogger.logPackAdded(packData, stickersToSave.length, updatedStats);
-      } catch (err) {
-        error('Erro ao obter estatísticas para log detalhado', err);
-      }
 
       return dbPackId;
 

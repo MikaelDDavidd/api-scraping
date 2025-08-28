@@ -5,8 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Environment variables
+.env
 .env.local
-.env.example
 .env.development.local
 .env.test.local
 .env.production.local
@@ -23,10 +23,6 @@ temp/
 # Data files
 data_captured/
 data_captured/*.json
-
-# Stickers directory (local development and production)
-stickers/
-queue_data/
 
 # OS generated files
 .DS_Store
