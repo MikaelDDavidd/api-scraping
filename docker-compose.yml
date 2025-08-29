@@ -45,7 +45,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # Comando padrão (pode ser sobrescrito)
+    # Comando padrão (usar versão enhanced otimizada)
     command: ["node", "index_enhanced.js"]
 
   # Serviço para testes (perfil separado)

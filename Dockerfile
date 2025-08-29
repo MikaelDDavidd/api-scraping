@@ -87,5 +87,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Default command (usar versão otimizada)
-CMD ["node", "index_enhanced.js"]
+# Default command (fallback para index.js se enhanced não existir)
+CMD ["node", "index.js"]
