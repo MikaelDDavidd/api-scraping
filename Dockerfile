@@ -1,7 +1,7 @@
 # Build stage
 FROM node:18-alpine AS builder
 
-# Install build dependencies for Sharp
+# Install build dependencies for Sharp and native modules
 RUN apk add --no-cache \
     python3 \
     make \
@@ -10,7 +10,11 @@ RUN apk add --no-cache \
     libc-dev \
     vips-dev \
     fftw-dev \
-    build-base
+    build-base \
+    libwebp-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    giflib-dev
 
 WORKDIR /app
 
@@ -26,17 +30,25 @@ COPY . .
 # Production stage
 FROM node:18-alpine
 
-# Install runtime dependencies for Sharp and image processing
+# Install runtime dependencies for image processing
 RUN apk add --no-cache \
+    # Sharp dependencies
     vips \
     vips-tools \
     fftw \
     libjpeg-turbo \
     libpng \
     libwebp \
+    libwebp-tools \
     giflib \
     librsvg \
-    tini
+    # WebP tools (necessário para cwebp e webpmux)
+    libwebp-tools \
+    # Process manager
+    tini \
+    # System tools
+    curl \
+    bash
 
 WORKDIR /app
 
@@ -46,11 +58,20 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Copy application code
-COPY --from=builder /app .
+# Copy application code from builder
+COPY --from=builder /app/services ./services
+COPY --from=builder /app/utils ./utils
+COPY --from=builder /app/config ./config
+COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/*.js ./
+COPY --from=builder /app/*.md ./
 
-# Create necessary directories
-RUN mkdir -p logs temp data_captured
+# Create necessary directories with proper permissions
+RUN mkdir -p logs temp data_captured .cache stickers && \
+    chmod 755 logs temp data_captured .cache stickers
+
+# Verify WebP tools are installed
+RUN cwebp -version && webpmux -version
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -59,8 +80,12 @@ RUN addgroup -g 1001 -S nodejs && \
 
 USER nodejs
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "process.exit(0)"
+
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Default command
-CMD ["node", "index.js"]
+# Default command (usar versão otimizada)
+CMD ["node", "index_enhanced.js"]

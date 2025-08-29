@@ -1,8 +1,9 @@
-version: '3.8'
-
 services:
+  # Serviço principal de scraping
   stickers-scraper:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: stickers-scraper
     restart: unless-stopped
     env_file:
@@ -10,20 +11,26 @@ services:
     environment:
       - NODE_ENV=production
       - TZ=America/Recife
+      - USE_LOCAL_STORAGE=true
+      - LOCAL_STORAGE_PATH=/home/ubuntu/stickers
     volumes:
-      # Persistent data volumes
+      # Logs e dados persistentes
       - ./logs:/app/logs
       - ./data_captured:/app/data_captured
-      - scraper_temp:/app/temp
-      # Config file (read-only)
+      - ./.cache:/app/.cache
+      # Storage de stickers (mapear para pasta da VPS)
+      - /home/ubuntu/stickers:/home/ubuntu/stickers
+      # Config (read-only)
       - ./.env:/app/.env:ro
+      # Temp directory
+      - scraper_temp:/app/temp
     networks:
       - scraper_network
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '1.0'
+          memory: 1.5G
+          cpus: '1.5'
         reservations:
           memory: 512M
           cpus: '0.5'
@@ -32,28 +39,36 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "5"
+        max-file: "3"
+    # Comando padrão (pode ser sobrescrito)
+    command: ["node", "index_enhanced.js"]
 
-  # Optional: Add scraper for testing
+  # Serviço para testes (perfil separado)
   stickers-scraper-test:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: stickers-scraper-test
     env_file:
       - .env
     environment:
       - NODE_ENV=development
       - TZ=America/Recife
-    command: ["node", "index.js", "test"]
+      - USE_LOCAL_STORAGE=true
+      - LOCAL_STORAGE_PATH=./stickers
+    command: ["node", "index_enhanced.js", "test"]
     volumes:
       - ./logs:/app/logs
       - ./data_captured:/app/data_captured
-      - scraper_temp:/app/temp
+      - ./.cache:/app/.cache
+      - ./stickers:/app/stickers
       - ./.env:/app/.env:ro
+      - scraper_temp:/app/temp
     networks:
       - scraper_network
     profiles:
@@ -62,30 +77,35 @@ services:
       driver: "json-file"
       options:
         max-size: "5m"
-        max-file: "3"
+        max-file: "2"
 
-  # Optional: Stats generator
-  stickers-scraper-stats:
-    build: .
-    container_name: stickers-scraper-stats
+  # Monitor de estatísticas (perfil separado)
+  stickers-monitor:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: stickers-monitor
     env_file:
       - .env
     environment:
       - NODE_ENV=production
       - TZ=America/Recife
-    command: ["node", "index.js", "stats"]
+    command: ["node", "monitor.js", "--watch"]
     volumes:
       - ./logs:/app/logs:ro
+      - ./data_captured:/app/data_captured:ro
+      - ./.cache:/app/.cache:ro
+      - ./stickers:/app/stickers:ro
       - ./.env:/app/.env:ro
     networks:
       - scraper_network
     profiles:
-      - stats
+      - monitor
     logging:
       driver: "json-file"
       options:
         max-size: "5m"
-        max-file: "3"
+        max-file: "2"
 
 networks:
   scraper_network:
