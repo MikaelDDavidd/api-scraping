@@ -8,17 +8,17 @@ O erro `Cannot find module '/app/index_enhanced.js'` foi corrigido. O arquivo es
 Se o container estiver reiniciando com erro de permissão nos logs:
 
 ```bash
-# Parar tudo primeiro
-docker-compose down
+# Parar o serviço principal
+docker compose stop stickers-scraper
 
 # Fixar permissões (IMPORTANTE: usar UID 1001 do container)
 sudo chown -R 1001:1001 logs data_captured .cache
 chmod 755 logs data_captured .cache
 
-# Limpar e recriar
-docker-compose down -v
-docker system prune -f
-docker-compose up -d
+# Limpar e recriar apenas o serviço principal
+docker compose down
+docker compose build --no-cache stickers-scraper
+docker compose up -d stickers-scraper
 ```
 
 ## 1. Preparação na VPS
@@ -54,42 +54,42 @@ STORAGE_BASE_URL=http://your-domain.com
 
 ```bash
 # Build da imagem
-docker-compose build
+docker compose build stickers-scraper
 
 # Testar primeiro
-docker-compose --profile test up stickers-scraper-test
+docker compose --profile test up stickers-scraper-test
 
 # Se funcionou, rodar em produção
-docker-compose up -d stickers-scraper
+docker compose up -d stickers-scraper
 ```
 
 ## 4. Verificar Status
 
 ```bash
 # Ver logs
-docker-compose logs -f stickers-scraper
+docker compose logs -f stickers-scraper
 
 # Status do container
-docker-compose ps
+docker compose ps
 
 # Ver arquivos criados
 ls -la /home/ubuntu/stickers/
 
 # Monitor
-docker-compose --profile monitor up stickers-monitor
+docker compose --profile monitor up stickers-monitor
 ```
 
 ## 5. Comandos Úteis
 
 ```bash
 # Parar
-docker-compose down
+docker compose down
 
 # Restart
-docker-compose restart stickers-scraper
+docker compose restart stickers-scraper
 
 # Executar comando específico
-docker-compose run --rm stickers-scraper node index_enhanced.js keywords amor brasil
+docker compose run --rm stickers-scraper node index_enhanced.js keywords amor brasil
 
 # Backup
 tar -czf stickers-backup-$(date +%Y%m%d).tar.gz /home/ubuntu/stickers/
@@ -116,19 +116,19 @@ Se o container ficar reiniciando com erro "permission denied" nos logs:
 
 ```bash
 # Parar containers
-docker-compose down
+docker compose down
 
 # Fixar permissões dos diretórios locais
 sudo chown -R 1001:1001 logs data_captured .cache
 chmod 755 logs data_captured .cache
 
 # Limpar volumes antigos se necessário
-docker-compose down -v
+docker compose down -v
 docker system prune -f
 
 # Recriar containers
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache stickers-scraper
+docker compose up -d stickers-scraper
 ```
 
 ### Erro de Módulo Não Encontrado
@@ -140,10 +140,10 @@ docker exec -it stickers-scraper ls -la /app/
 docker exec -it stickers-scraper node --version
 
 # Rebuild completo
-docker-compose down
+docker compose down
 docker system prune -f
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache stickers-scraper
+docker compose up -d stickers-scraper
 ```
 
 ## 8. Configuração Nginx (Opcional)
@@ -169,8 +169,8 @@ server {
 # Criar script de restart
 cat > restart-scraper.sh << 'EOF'
 #!/bin/bash
-docker-compose down
-docker-compose up -d stickers-scraper
+docker compose down
+docker compose up -d stickers-scraper
 EOF
 
 chmod +x restart-scraper.sh
@@ -183,16 +183,16 @@ echo "0 4 * * * /path/to/restart-scraper.sh" | crontab -
 
 ```bash
 # 1. Build e Deploy Completo
-docker-compose build && docker-compose up -d
+docker compose build stickers-scraper && docker compose up -d stickers-scraper
 
 # 2. Ver se está funcionando
-docker-compose logs -f --tail=50 stickers-scraper
+docker compose logs -f --tail=50 stickers-scraper
 
 # 3. Teste específico
-docker-compose run --rm stickers-scraper node index_enhanced.js test
+docker compose run --rm stickers-scraper node index_enhanced.js test
 
 # 4. Monitor
-docker-compose --profile monitor up -d stickers-monitor
+docker compose --profile monitor up -d stickers-monitor
 ```
 
 ✅ **O projeto está pronto para rodar na VPS!**
