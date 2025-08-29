@@ -70,13 +70,15 @@ COPY --from=builder /app/*.md ./
 RUN mkdir -p logs temp data_captured .cache stickers && \
     chmod 755 logs temp data_captured .cache stickers
 
-# Verify WebP tools are installed
-RUN cwebp -version && webpmux -version
-
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
+    adduser -S nodejs -u 1001
+
+# Change ownership of directories to nodejs user
+RUN chown -R nodejs:nodejs /app
+
+# Verify WebP tools are installed
+RUN cwebp -version && webpmux -version
 
 USER nodejs
 
