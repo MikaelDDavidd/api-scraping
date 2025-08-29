@@ -3,6 +3,24 @@
 ## Problema Resolvido
 O erro `Cannot find module '/app/index_enhanced.js'` foi corrigido. O arquivo está presente no container.
 
+## 🚨 FIX RÁPIDO - Erro de Permissão EACCES
+
+Se o container estiver reiniciando com erro de permissão nos logs:
+
+```bash
+# Parar tudo primeiro
+docker-compose down
+
+# Fixar permissões (IMPORTANTE: usar UID 1001 do container)
+sudo chown -R 1001:1001 logs data_captured .cache
+chmod 755 logs data_captured .cache
+
+# Limpar e recriar
+docker-compose down -v
+docker system prune -f
+docker-compose up -d
+```
+
 ## 1. Preparação na VPS
 
 ```bash
@@ -12,6 +30,11 @@ sudo chown ubuntu:ubuntu /home/ubuntu/stickers
 
 # Navegar para o projeto
 cd /path/to/api-scraping
+
+# IMPORTANTE: Criar e configurar diretórios locais com permissões corretas
+mkdir -p logs data_captured .cache stickers
+sudo chown -R 1001:1001 logs data_captured .cache
+chmod 755 logs data_captured .cache
 ```
 
 ## 2. Atualizar .env para Produção
@@ -88,6 +111,27 @@ du -sh /home/ubuntu/stickers/
 
 ## 7. Troubleshooting
 
+### Erro de Permissão nos Logs (EACCES)
+Se o container ficar reiniciando com erro "permission denied" nos logs:
+
+```bash
+# Parar containers
+docker-compose down
+
+# Fixar permissões dos diretórios locais
+sudo chown -R 1001:1001 logs data_captured .cache
+chmod 755 logs data_captured .cache
+
+# Limpar volumes antigos se necessário
+docker-compose down -v
+docker system prune -f
+
+# Recriar containers
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### Erro de Módulo Não Encontrado
 Se ainda der erro de módulo não encontrado:
 
 ```bash
