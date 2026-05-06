@@ -1,301 +1,194 @@
-# 🎯 Stickers Scraper
+<div align="center">
 
-Sistema completo de scraping de stickers do sticker.ly para Supabase, desenvolvido para o app Stickers & Memes.
+# Stickers Scraper
 
-## 📋 Características
+**Automated sticker pack scraper for sticker.ly with WhatsApp-ready output.**
 
-- **Scraping Inteligente**: Busca packs recomendados e por palavras-chave
-- **Compatibilidade WhatsApp**: Processamento que atende 100% dos requisitos do WhatsApp
-- **Processamento de Imagens**: Converte, redimensiona e otimiza automaticamente
-- **Upload Automático**: Integração completa com Supabase Storage + Database
-- **Sistema de Logs**: Logging detalhado com níveis configuráveis
-- **Tratamento de Erros**: Retry automático e tratamento robusto de falhas
-- **Multi-idioma**: Suporte a múltiplos locales (pt-BR, en-US, es-ES, fr-FR)
-- **Controle de Taxa**: Rate limiting para não sobrecarregar APIs
-- **Geração de Emojis**: Sistema inteligente de associação de emojis aos stickers
-- **Validação Rigorosa**: Validação completa dos requisitos técnicos do WhatsApp
+A Node.js pipeline that discovers, downloads, processes, and uploads sticker packs to Supabase — fully compliant with WhatsApp's strict sticker requirements. Built to feed the Stickers & Memes app.
 
-## 🚀 Instalação
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Supabase](https://img.shields.io/badge/Supabase-Storage%20%2B%20DB-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![Sharp](https://img.shields.io/badge/Sharp-Image%20Processing-99CC00)](https://sharp.pixelplumbing.com)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
-1. **Clone e navegue para o diretório:**
+</div>
+
+---
+
+## Overview
+
+Stickers Scraper is a backend job that pulls sticker packs from sticker.ly's public API, normalizes every image to WhatsApp's exact spec (dimensions, format, file size, transparency), enriches packs with auto-generated emojis, and persists everything to Supabase Storage and Postgres.
+
+It runs as a one-shot CLI, a long-running container, or a scheduled cron job. Multiple ingestion modes (recommended packs, keyword search, full crawl) cover both cold-start population and continuous content refresh.
+
+### Key Features
+
+- **WhatsApp-Compliant Output** — Every sticker is converted to 512x512 WebP under 100KB; tray icons to 96x96 PNG under 50KB; pack sizes enforced between 3 and 30
+- **Multi-Mode Scraping** — Pull recommended packs, search by keywords, or run a full crawl across locales
+- **Multi-Locale Support** — pt-BR, en-US, es-ES, fr-FR out of the box
+- **Smart Emoji Tagging** — Auto-associates relevant emojis to each sticker based on filename heuristics
+- **Duplicate Detection** — Fast pre-check skips packs already in the database
+- **Image Pipeline** — Sharp-powered conversion, resizing, transparency handling, and quality optimization
+- **Resilient Networking** — Configurable rate limiting, retries, and graceful failure handling
+- **Persistent State** — Resumable sessions with state stored between runs
+- **Structured Logging** — Winston with daily-rotated files plus colorized console output
+- **Production-Ready** — Dockerfile, Compose stack, and VPS deploy guide included
+
+## Tech Stack
+
+- **Runtime**: Node.js 18+
+- **Storage & DB**: Supabase (Storage buckets + Postgres)
+- **Image Processing**: Sharp, adm-zip
+- **HTTP**: Axios with retry/backoff
+- **Logging**: Winston + winston-daily-rotate-file, Chalk
+- **Config**: dotenv
+- **Packaging**: Docker, Docker Compose
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18 or higher
+- A Supabase project with Storage enabled
+- Tables: `packs`, `stickers`, `scraping_state`, `stats`
+
+### Installation
+
 ```bash
+git clone git@gitlab.com:mikaeldavidlopes/api-scraping.git
 cd api-scraping
-```
-
-2. **Instale as dependências:**
-```bash
 npm install
-```
-
-3. **Configure as variáveis de ambiente:**
-```bash
 cp .env.example .env
-# Edite o arquivo .env com suas configurações
+# fill in your Supabase credentials
 ```
 
-4. **Execute o scraper:**
-```bash
-npm start
-```
-
-## ⚙️ Configuração
-
-### Variáveis de Ambiente (.env)
+### Environment Variables
 
 ```env
-# Supabase Configuration
 SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key  
+SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_KEY=your_supabase_service_key
-
-# Storage Configuration
 SUPABASE_BUCKET_NAME=stickers
 
-# Scraping Configuration
 MAX_PACKS_PER_RUN=50
 DELAY_BETWEEN_REQUESTS=2000
 MAX_RETRIES=3
 
-# Logging
 LOG_LEVEL=info
 ```
 
-### Estrutura do Banco de Dados
-
-O sistema utiliza as tabelas existentes do projeto:
-- `packs`: Informações dos packs
-- `stickers`: Informações individuais dos stickers
-- `scraping_state`: Estado do scraping
-- `stats`: Estatísticas de uso
-
-## 📖 Uso
-
-### Comandos Básicos
+### Running
 
 ```bash
-# Processamento completo (padrão)
-node index.js
+# Default: full processing run
+npm start
 
-# Apenas packs recomendados
+# Recommended packs only
 node index.js recommended
 
-# Busca por keywords específicas
-node index.js keywords memes funny amor
+# Keyword search
+node index.js keywords memes funny love
 
-# Processamento completo com keywords customizadas
-node index.js full trabalho família amigos
+# Full run with custom keywords
+node index.js full work family friends
 
-# Modo de teste (1 pack por locale)
+# Test mode (1 pack per locale)
 node index.js test
 
-# Mostrar estatísticas
+# Show stats
 node index.js stats
 
-# Ajuda
+# Help
 node index.js help
 ```
 
-### Scripts NPM
+### Docker
 
 ```bash
-npm start          # Execução normal
-npm run dev        # Execução com nodemon (desenvolvimento)
+docker compose up -d
 ```
 
-## 🏗️ Arquitetura
+See `DEPLOY-GUIDE.md` and `VPS-DEPLOY-FINAL.md` for production deployment notes.
 
-### Estrutura de Diretórios
+## WhatsApp Compliance
+
+The pipeline strictly follows WhatsApp's official sticker spec:
+
+| Asset | Format | Dimensions | Max Size |
+|---|---|---|---|
+| Tray icon | PNG | 96 x 96 | 50 KB |
+| Static sticker | WebP | 512 x 512 | 100 KB |
+| Animated sticker | WebP (animated) | 512 x 512 | 500 KB |
+| Pack | — | 3 to 30 stickers | — |
+
+Transparency is preserved automatically, and every sticker is tagged with at least one emoji.
+
+## Processing Flow
+
+1. **Discover** — Query sticker.ly for recommended or keyword-matched packs
+2. **Deduplicate** — Skip packs already present in Supabase
+3. **Download** — Pull all sticker assets for the pack
+4. **Process** — Convert, resize, and optimize via Sharp; build the tray icon
+5. **Upload** — Push assets to Supabase Storage
+6. **Persist** — Write pack and sticker metadata to Postgres
+7. **Log** — Record outcomes with structured events for monitoring
+
+## Project Structure
 
 ```
 api-scraping/
 ├── config/
-│   └── config.js           # Configurações centralizadas
+│   └── config.js                  # Centralized configuration
 ├── services/
-│   ├── stickerlyClient.js  # Cliente para API do sticker.ly
-│   ├── imageProcessor.js   # Processamento de imagens
-│   ├── supabaseClient.js   # Cliente Supabase
-│   └── packProcessor.js    # Coordenador principal
+│   ├── stickerlyClient.js         # sticker.ly API client
+│   ├── optimizedStickerlyClient.js
+│   ├── imageProcessor.js          # Sharp pipeline
+│   ├── supabaseClient.js          # Supabase Storage + DB
+│   ├── localStorageClient.js      # Local fallback
+│   ├── packProcessor.js           # Main orchestrator
+│   ├── enhancedPackProcessor.js
+│   ├── optimizedPackProcessor.js
+│   ├── fastDuplicateChecker.js
+│   ├── persistentStateManager.js  # Resumable sessions
+│   ├── searchCache.js
+│   └── metricsLogger.js
 ├── utils/
-│   └── logger.js           # Sistema de logging
-├── temp/                   # Arquivos temporários
-├── logs/                   # Arquivos de log
-└── index.js               # Ponto de entrada
+│   ├── logger.js                  # Winston setup
+│   ├── betterLogger.js
+│   ├── sessionStats.js
+│   └── whatsappExporter.js        # WhatsApp pack export
+├── migrations/
+│   └── add_emoji_column.sql
+├── Dockerfile
+├── docker-compose.yml
+├── monitor.js                     # Live monitoring
+├── index.js                       # Entry point
+└── index_enhanced.js              # Alt entry with extra features
 ```
 
-### Fluxo de Processamento
+## Automation
 
-1. **Descoberta**: Busca packs via API do sticker.ly
-2. **Validação**: Verifica se pack já existe no banco
-3. **Download**: Baixa todos os stickers do pack
-4. **Processamento**: Converte/otimiza imagens
-5. **Upload**: Envia para Supabase Storage
-6. **Registro**: Salva metadados no banco
-7. **Logging**: Registra todas as operações
+Run on a schedule with cron:
 
-## ✅ Compatibilidade com WhatsApp
-
-O sistema foi desenvolvido seguindo rigorosamente a documentação oficial do WhatsApp para stickers:
-
-### Requisitos Técnicos Atendidos
-
-#### 🖼️ **Tray (Ícone do Pack)**
-- ✅ Formato: PNG obrigatório  
-- ✅ Dimensões: Exatamente 96x96 pixels
-- ✅ Tamanho: Menor que 50KB
-- ✅ Processamento: Conversão automática e otimização
-
-#### 🎨 **Stickers Estáticos**
-- ✅ Formato: WebP obrigatório
-- ✅ Dimensões: Exatamente 512x512 pixels  
-- ✅ Tamanho: Menor que 100KB por arquivo
-- ✅ Fundo: Transparente automático
-- ✅ Emojis: Pelo menos 1 emoji por sticker
-
-#### 🎭 **Stickers Animados**
-- ✅ Formato: WebP animado obrigatório
-- ✅ Dimensões: Exatamente 512x512 pixels
-- ✅ Tamanho: Menor que 500KB por arquivo
-- ✅ Fundo: Transparente automático  
-- ✅ Emojis: Pelo menos 1 emoji por sticker
-
-#### 📦 **Pack Requirements**
-- ✅ Quantidade: Entre 3 e 30 stickers obrigatório
-- ✅ Identificador: Único e válido
-- ✅ Nome e Autor: Obrigatórios e válidos
-- ✅ Metadados: Completos para export
-
-### Sistema de Emojis Inteligente
-
-O scraper gera automaticamente emojis apropriados baseado no nome dos arquivos:
-
-```javascript
-// Exemplos de mapeamento automático
-'smile_happy.webp' → ['😊', '😄', '😃']
-'cat_love.webp' → ['🐱', '😸', '❤️']  
-'fire_cool.webp' → ['🔥', '💥', '⚡']
-'brasil_flag.webp' → ['🇧🇷', '💚', '💛']
-```
-
-## 🛠️ Serviços
-
-### StickerlyClient
-- Comunicação com API do sticker.ly
-- Rate limiting e retry automático
-- Suporte a múltiplos locales
-- Download de arquivos
-
-### ImageProcessor
-- Conversão para WebP
-- Redimensionamento inteligente
-- Criação de thumbnails (tray)
-- Validação de imagens
-- Otimização de qualidade
-
-### SupabaseClient
-- Upload para Storage
-- Operações no banco de dados
-- Verificação de duplicatas
-- Gerenciamento de estatísticas
-
-### PackProcessor
-- Coordenação de todo o processo
-- Controle de sessão
-- Estatísticas em tempo real
-- Tratamento de erros
-
-## 📊 Logging e Monitoramento
-
-### Níveis de Log
-- `error`: Erros críticos
-- `warn`: Avisos importantes
-- `info`: Informações gerais
-- `debug`: Detalhes técnicos
-
-### Eventos Especiais
-- `pack_found`: Pack descoberto
-- `pack_processed`: Pack processado (sucesso/falha)
-- `sticker_processed`: Sticker individual processado
-- `upload_success/error`: Status de uploads
-- `scraping_start/end`: Início/fim de sessões
-
-### Arquivos de Log
-- Console: Output colorizado para desenvolvimento
-- Arquivo: `logs/scraper.log` com rotação automática
-
-## 🔧 Configurações Avançadas
-
-### Limitações de Taxa
-```javascript
-delayBetweenRequests: 2000,  // 2s entre requests
-maxRetries: 3,               // 3 tentativas por request
-maxPacksPerRun: 50          // Máximo 50 packs por execução
-```
-
-### Processamento de Imagens
-```javascript
-maxStickerSize: { width: 512, height: 512 },
-traySize: { width: 96, height: 96 },
-quality: 80,
-maxFileSize: 50 * 1024 * 1024  // 50MB
-```
-
-### Locales Suportados
-- `pt-BR`: Português Brasil
-- `en-US`: Inglês EUA
-- `es-ES`: Espanhol Espanha
-- `fr-FR`: Francês França
-
-## 🐛 Resolução de Problemas
-
-### Problemas Comuns
-
-**Erro de autenticação Supabase:**
-- Verifique as chaves no arquivo `.env`
-- Confirme se o service key tem permissões adequadas
-
-**Falha no upload:**
-- Verifique se o bucket existe no Supabase
-- Confirme as políticas de acesso do Storage
-
-**Rate limiting:**
-- Aumente `DELAY_BETWEEN_REQUESTS` no `.env`
-- Reduza `MAX_PACKS_PER_RUN`
-
-**Imagens corrompidas:**
-- O sistema automaticamente pula imagens inválidas
-- Verifique os logs para detalhes específicos
-
-### Debug
-
-Para debug detalhado:
 ```bash
-LOG_LEVEL=debug node index.js test
-```
-
-## 📈 Estatísticas
-
-O sistema coleta automaticamente:
-- Total de packs processados
-- Taxa de sucesso/falha
-- Tempo de processamento
-- Tamanho dos arquivos
-- Estatísticas por locale
-
-## 🤝 Integração com App Principal
-
-O scraper foi projetado para funcionar com a estrutura existente:
-- Usa as mesmas tabelas do banco
-- Mantém compatibilidade com a API atual
-- Segue os padrões de nomenclatura estabelecidos
-
-## 🔄 Automação
-
-Para execução automática, configure um cron job:
-```bash
-# Executa diariamente às 2h da manhã
+# Daily at 2 AM
 0 2 * * * cd /path/to/api-scraping && node index.js >> cron.log 2>&1
 ```
 
-## 📄 Licença
+## Troubleshooting
 
-Este projeto faz parte do app Stickers & Memes e segue a mesma licença do projeto principal.
+- **Supabase auth errors** — verify keys in `.env` and confirm the service key has the right policies
+- **Upload failures** — confirm the bucket exists and Storage policies allow writes
+- **Rate limiting** — increase `DELAY_BETWEEN_REQUESTS` or lower `MAX_PACKS_PER_RUN`
+- **Debug output** — `LOG_LEVEL=debug node index.js test`
+
+## License
+
+ISC. Part of the Stickers & Memes app ecosystem.
+
+---
+
+<div align="center">
+Built by <a href="https://github.com/MikaelDDavidd">Mikael David</a>
+</div>
