@@ -113,10 +113,10 @@ const config = {
     stickerSize: { width: 512, height: 512 }, // EXATO para WhatsApp
     quality: 80,
     
-    // Limites de tamanho do WhatsApp
+    // Limites de tamanho do WhatsApp (conservador para evitar rejeições)
     maxTraySize: 50 * 1024,      // 50KB para tray (PNG)
     maxStaticSize: 100 * 1024,   // 100KB para sticker estático  
-    maxAnimatedSize: 500 * 1024, // 500KB para sticker animado
+    maxAnimatedSize: 450 * 1024, // 450KB para sticker animado (conservador, oficial é 500KB)
     
     formats: {
       input: ['webp', 'png', 'gif'],

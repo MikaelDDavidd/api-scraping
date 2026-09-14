@@ -93,3 +93,6 @@ jspm_packages/
 *.njsproj
 *.sln
 *.sw?
+# dump grande de scraping, não versionar
+stickers_vps/
+exploration_results/

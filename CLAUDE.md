@@ -1,5 +1,16 @@
 # CLAUDE.md
 
+## ⚠️ REGRA CRÍTICA — Sincronizar progresso no Atlas (via MCP)
+
+Este projeto é rastreado no **Atlas** (painel pessoal do Mikael — https://atlas.odd-now.com, aba Trabalho). Ao trabalhar neste repositório você DEVE registrar o andamento usando o MCP server `atlas`:
+
+1. **Ao começar**: rode `list_work_projects` pra achar este projeto (match pelo nome). Se não existir, `create_work_project`. Depois `create_work_task` com a tarefa atual (`status: doing`, `projectId` do projeto).
+2. **Ao concluir**: `update_work_task` → `status: done`. Se o projeto mudou de fase (pausou/terminou), `update_work_project`.
+
+Nunca duplicar projeto — sempre `list_work_projects` antes de criar. Se o MCP estiver fora do ar, avise e siga o trabalho normalmente (não trave a sessão).
+
+**Guia completo do MCP:** `~/brain/04-Projetos/atlas-mcp-guia.md`
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Core Purpose

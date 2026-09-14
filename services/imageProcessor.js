@@ -87,8 +87,8 @@ class ImageProcessor {
             totalFrames: fileInfo.totalFrames
           });
           
-          // Usar webpmux para redimensionar mantendo animação (como API original)
-          await this.resizeAnimatedWebP(tempInputPath, tempOutputPath);
+          // Usar novo método de tratamento automático para garantir conformidade
+          const treatment = await this.treatAnimatedWebP(tempInputPath, tempOutputPath);
           
         } else {
           // Arquivo estático OU API diz que é estático: processar como estático
@@ -109,7 +109,7 @@ class ImageProcessor {
         // Ler resultado
         outputBuffer = await fs.readFile(tempOutputPath);
 
-        // Validar tamanho final
+        // Validar tamanho final (usando limite conservador)
         const maxSize = (actuallyAnimated && isAnimated) ? config.image.maxAnimatedSize : config.image.maxStaticSize;
         if (outputBuffer.length > maxSize) {
           warn(`Sticker excede limite de tamanho`, {
@@ -122,23 +122,22 @@ class ImageProcessor {
           
           // Tentar recompressão com qualidade menor
           if (actuallyAnimated && isAnimated) {
-            // Para animados, implementar compressão agressiva em múltiplas tentativas
-            let attempts = 0;
-            const maxAttempts = 3;
-            const qualities = [60, 45, 30]; // Qualidades progressivamente menores
+            // Para animados, usar novo método de tratamento que já garante conformidade
+            info(`Aplicando tratamento automático para reduzir tamanho`, {
+              filename: outputFilename,
+              packId,
+              currentSize: outputBuffer.length,
+              targetSize: maxSize
+            });
             
-            while (outputBuffer.length > maxSize && attempts < maxAttempts) {
-              const quality = qualities[attempts];
-              info(`Tentativa ${attempts + 1}: compressão agressiva com qualidade ${quality}`, {
-                filename: outputFilename,
-                packId,
-                currentSize: outputBuffer.length,
-                targetSize: maxSize
-              });
-              
-              await this.resizeAnimatedWebPAggressive(tempInputPath, tempOutputPath, quality, maxSize);
+            // Reprocessar com tratamento automático e qualidade menor
+            const treatment = await this.treatAnimatedWebP(tempInputPath, tempOutputPath, 60);
+            outputBuffer = await fs.readFile(tempOutputPath);
+            
+            // Se ainda estiver grande, tentar compressão mais agressiva
+            if (outputBuffer.length > maxSize) {
+              await this.resizeAnimatedWebPAggressive(tempInputPath, tempOutputPath, 40, maxSize);
               outputBuffer = await fs.readFile(tempOutputPath);
-              attempts++;
             }
           } else {
             // Para estáticos, recompressão normal
@@ -430,7 +429,7 @@ class ImageProcessor {
   }
 
   /**
-   * Obtém informações do WebP (como na API original)
+   * Obtém informações detalhadas do WebP incluindo duração individual de frames
    */
   async getWebPInfo(filePath) {
     try {
@@ -439,7 +438,11 @@ class ImageProcessor {
       const info = {
         totalFrames: 0,
         duration: 0,
-        size: { w: 0, h: 0 }
+        size: { w: 0, h: 0 },
+        frameDurations: [], // Array com duração individual de cada frame
+        minFrameDuration: null,
+        maxFrameDuration: null,
+        avgFrameDuration: null
       };
       
       const lines = stdout.split('\n');
@@ -460,23 +463,186 @@ class ImageProcessor {
         }
       }
       
-      // Calcular duração total (se tiver frames)
+      // Calcular duração total e individual dos frames
       const headerIndex = lines.findIndex(line => line.indexOf('No.:') === 0);
       if (headerIndex >= 0) {
         let duration = 0;
         for (let i = headerIndex + 1; i < lines.length; i++) {
           const columns = lines[i].split(/\s+/).filter(col => col !== '');
           if (columns[6]) {
-            duration += parseInt(columns[6]) || 0;
+            const frameDuration = parseInt(columns[6]) || 0;
+            info.frameDurations.push(frameDuration);
+            duration += frameDuration;
           }
         }
         info.duration = duration;
+        
+        // Calcular estatísticas dos frames
+        if (info.frameDurations.length > 0) {
+          info.minFrameDuration = Math.min(...info.frameDurations);
+          info.maxFrameDuration = Math.max(...info.frameDurations);
+          info.avgFrameDuration = Math.round(duration / info.frameDurations.length);
+        }
       }
       
       return info;
     } catch (err) {
       debug('Erro ao obter info do WebP', err);
-      return { totalFrames: 0, duration: 0, size: { w: 0, h: 0 } };
+      return { 
+        totalFrames: 0, 
+        duration: 0, 
+        size: { w: 0, h: 0 },
+        frameDurations: [],
+        minFrameDuration: null,
+        maxFrameDuration: null,
+        avgFrameDuration: null
+      };
+    }
+  }
+
+  /**
+   * Trata automaticamente animações para atender requisitos do WhatsApp
+   * - Duração máxima: 10 segundos (10000ms)
+   * - Frame mínimo: 8ms
+   * - Tamanho máximo: 450KB (conservador)
+   */
+  async treatAnimatedWebP(inputPath, outputPath, quality = config.image.quality) {
+    try {
+      const info = await this.getWebPInfo(inputPath);
+      
+      // Se não é animado, processar como estático
+      if (info.totalFrames <= 1) {
+        await execFileAsync('cwebp', [
+          '-q', quality.toString(),
+          '-resize', '512', '512',
+          inputPath,
+          '-o', outputPath
+        ]);
+        return { treated: false, reason: 'not_animated' };
+      }
+      
+      let needsTreatment = false;
+      const treatments = [];
+      
+      // Verificar se precisa tratamento
+      if (info.duration > 10000) {
+        needsTreatment = true;
+        treatments.push('duration_exceeded');
+        warn(`Animação muito longa: ${info.duration}ms, será ajustada para 10s`);
+      }
+      
+      if (info.minFrameDuration && info.minFrameDuration < 8) {
+        needsTreatment = true;
+        treatments.push('frame_too_fast');
+        warn(`Frames muito rápidos detectados: ${info.minFrameDuration}ms, serão ajustados para 8ms mínimo`);
+      }
+      
+      if (!needsTreatment) {
+        // Se não precisa tratamento, apenas redimensionar normalmente
+        await this.resizeAnimatedWebP(inputPath, outputPath, quality);
+        return { treated: false, reason: 'already_compliant' };
+      }
+      
+      // APLICAR TRATAMENTOS
+      const frameDir = path.join(this.tempDir, `treat_${Date.now()}`);
+      await fs.ensureDir(frameDir);
+      
+      try {
+        // Estratégia de tratamento baseada no problema
+        let targetFrameCount = info.totalFrames;
+        let targetFrameDuration = info.avgFrameDuration || 100;
+        
+        // TRATAMENTO 1: Duração > 10 segundos
+        if (info.duration > 10000) {
+          // Opção A: Reduzir número de frames mantendo fluidez
+          const reductionFactor = Math.ceil(info.duration / 10000);
+          if (reductionFactor > 1 && info.totalFrames > 30) {
+            // Se tem muitos frames, podemos pular alguns
+            targetFrameCount = Math.ceil(info.totalFrames / reductionFactor);
+            info(`Reduzindo de ${info.totalFrames} para ${targetFrameCount} frames (fator: ${reductionFactor})`);
+          } else {
+            // Se tem poucos frames, ajustar duração individual
+            targetFrameDuration = Math.floor(10000 / info.totalFrames);
+            info(`Ajustando duração dos frames para ${targetFrameDuration}ms`);
+          }
+        }
+        
+        // TRATAMENTO 2: Frames < 8ms
+        if (info.minFrameDuration && info.minFrameDuration < 8) {
+          targetFrameDuration = Math.max(targetFrameDuration, 8);
+          info(`Ajustando duração mínima dos frames para 8ms`);
+        }
+        
+        // Garantir que duração total não exceda 10s após ajustes
+        const projectedDuration = targetFrameCount * targetFrameDuration;
+        if (projectedDuration > 10000) {
+          targetFrameDuration = Math.floor(10000 / targetFrameCount);
+          info(`Ajuste final: ${targetFrameCount} frames x ${targetFrameDuration}ms = ${targetFrameCount * targetFrameDuration}ms`);
+        }
+        
+        // Extrair e processar frames
+        const frameFiles = [];
+        const frameSkip = Math.ceil(info.totalFrames / targetFrameCount);
+        let extractedCount = 0;
+        
+        for (let i = 1; i <= info.totalFrames; i += frameSkip) {
+          const framePath = path.join(frameDir, `frame_${extractedCount}.webp`);
+          await execFileAsync('webpmux', ['-get', 'frame', i.toString(), inputPath, '-o', framePath]);
+          
+          // Redimensionar frame
+          const resizedPath = path.join(frameDir, `resized_${extractedCount}.webp`);
+          await execFileAsync('cwebp', [
+            '-q', quality.toString(),
+            '-resize', '512', '512',
+            framePath,
+            '-o', resizedPath
+          ]);
+          
+          frameFiles.push(resizedPath);
+          extractedCount++;
+        }
+        
+        // Recriar WebP animado com frames tratados
+        const webpmuxArgs = [];
+        frameFiles.forEach((framePath) => {
+          webpmuxArgs.push('-frame', framePath, `+${targetFrameDuration}`);
+        });
+        webpmuxArgs.push('-loop', '0', '-o', outputPath);
+        
+        await execFileAsync('webpmux', webpmuxArgs);
+        
+        // Verificar resultado final
+        const finalInfo = await this.getWebPInfo(outputPath);
+        info(`Tratamento concluído`, {
+          original: {
+            frames: info.totalFrames,
+            duration: info.duration,
+            minFrame: info.minFrameDuration
+          },
+          treated: {
+            frames: finalInfo.totalFrames,
+            duration: finalInfo.duration,
+            minFrame: finalInfo.minFrameDuration
+          },
+          treatments: treatments
+        });
+        
+        return {
+          treated: true,
+          treatments: treatments,
+          original: info,
+          final: finalInfo
+        };
+        
+      } finally {
+        await fs.remove(frameDir);
+      }
+      
+    } catch (err) {
+      error('Erro ao tratar WebP animado', err);
+      // Fallback: tentar redimensionar normalmente
+      await this.resizeAnimatedWebP(inputPath, outputPath, quality);
+      return { treated: false, reason: 'treatment_failed', error: err.message };
     }
   }
 
